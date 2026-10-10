@@ -1,0 +1,80 @@
+{
+  "models": {
+    "mode": "merge",
+    "providers": {
+      "deepseek": {
+        "baseUrl": "https://api.deepseek.com/v1",
+        "apiKey": "sk-REPLACE_WITH_YOUR_DEEPSEEK_KEY",
+        "api": "openai-completions",
+        "models": [
+          {
+            "id": "deepseek-v4-flash",
+            "name": "DeepSeek V4 Flash",
+            "contextWindow": 128000,
+            "maxTokens": 8192,
+            "input": [
+              "text"
+            ]
+          },
+          {
+            "id": "deepseek-v4-pro",
+            "name": "DeepSeek V4 Pro",
+            "contextWindow": 128000,
+            "maxTokens": 8192,
+            "input": [
+              "text"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "deepseek/deepseek-v4-flash",
+        "fallbacks": [
+          "deepseek/deepseek-v4-pro"
+        ]
+      }
+    }
+  },
+  "channels": {
+    "qqbot": {
+      "enabled": true,
+      "appId": "REPLACE_WITH_QQ_BOT_APPID",
+      "clientSecret": "REPLACE_WITH_QQ_BOT_CLIENT_SECRET",
+      "dmPolicy": "open",
+      "allowFrom": [
+        "*"
+      ],
+      "markdownSupport": false,
+      "name": "AI交易员比格"
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "auth": {
+      "mode": "token",
+      "token": "REPLACE_WITH_GATEWAY_TOKEN"
+    }
+  },
+  "meta": {
+    "lastTouchedVersion": "2026.7.1-2",
+    "lastTouchedAt": "2026-09-13T16:45:25.964Z"
+  },
+  "plugins": {
+    "entries": {
+      "qqbot": {
+        "enabled": true
+      },
+      "deepseek": {
+        "enabled": true
+      }
+    },
+    "allow": [
+      "deepseek",
+      "qqbot"
+    ]
+  }
+}
