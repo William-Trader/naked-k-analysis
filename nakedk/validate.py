@@ -48,6 +48,21 @@ def check_numbers(text: str, source: str, tol: float = 0.02) -> dict:
     return {"ok": not suspects, "suspects": suspects[:20]}
 
 
+def check_message(text: str) -> dict:
+    """Enforce the one-screen contract: length, no tables, required blocks."""
+    issues = []
+    if len(text) > 900:
+        issues.append("超长")
+    for line in text.splitlines():
+        if line.startswith("|") and line.count("|") >= 2:
+            issues.append("包含表格")
+            break
+    for must in ("结论", "数据", "非投资建议"):
+        if must not in text:
+            issues.append("缺少" + must)
+    return {"ok": not issues, "issues": issues, "chars": len(text)}
+
+
 def main(argv=None):
     argv = argv or sys.argv[1:]
     if not argv:

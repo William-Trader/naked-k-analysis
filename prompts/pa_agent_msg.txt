@@ -4,30 +4,35 @@
 2. 运行 exec: cat /opt/naked-k-analysis/nakedk-dashboard/knowledge/05-decision-tree.md /opt/naked-k-analysis/nakedk-dashboard/knowledge/08-albrooks-deep.md /opt/naked-k-analysis/nakedk-dashboard/knowledge/09-review-rubric.md
 3. 按 08 的 12 问检查表分析，按 06 模板输出。
 
+输出必须是一屏可执行的结构，顺序固定，缺项视为不合格：
+
+<币种> · 4h
+结论：偏多/偏空/中性 · 置信 <0-100>
+触发：<价格>（现价 <价格>）
+止损：<价格>（<±%>）
+目标：<价格>（R:R <数字>）
+仓位：风险 0.5% · 名义 <数字>%
+失效：4h收盘 <价格> 或 <N> 小时未触发
+依据：结构 <state/BOS/CHoCH> · <形态> · MTF <alignment> · 信号K <score>
+数据：Binance · <时间> · 非投资建议
+
 硬性规则：
-- 先写高周期方向 + 市场周期阶段（突破/紧通道/宽通道/区间）+ Always-In。
-- 必须读取并引用数据中的 **TREND** 和 **PATTERN** 行；PATTERN 是形态候选，至少引用一个（没有就写“无标准形态”）。
-- 必须读取 **BAR / STRUCT / MTF / LOC / VOLP / SIGBAR** 行：
-  - 结构判断引用 STRUCT 的 state（up/down/range/transition）与 BOS/CHoCH，不得只写“趋势/震荡”；
-  - 方向必须与 MTF alignment 一致：alignment ≥ +2 不得做空，≤ −2 不得做多；
-  - 信号K必须引用 SIGBAR 分数与缺失项；score < 40 视为无效信号K，不得给方向。
-- 每轮必须写 Always-In（Always-In = 多/空/中性）；漏写视为不合格。
-- 方向只允许 多/空/中性；周期固定 4h；不做 24h 方向预测。
+- 必须引用 BAR / STRUCT / MTF / LOC / VOLP / SIGBAR / FLOW / MICRO / VOLS / CROSS / PLAN 中至少 5 行。
+- 方向必须与 MTF alignment 一致：alignment ≥ +2 不得做空，≤ −2 不得做多；冲突时写中性。
+- 信号K score < 40 → 不得给方向；SIGBAR 的 missing 项必须写出来。
+- FLOW 的 div=yes 时，不得顺着背离方向给新仓；shape=absorption_* 时只写“等确认”。
+- VOLS 的 state=expansion 时，止损至少 1.5×ATR；contraction 时不得用宽止损。
+- CROSS 的 corr30 > 0.8 时，BTC/ETH 只算一个风险，不得两边同时给同向方向。
 - 每个币必须写 Setup；没有就写“无标准 setup”。
 - DT/MTR 不得直接给方向；必须等确认（趋势线破 + HL/LH + 强反转K），否则中性。
 - BLSHS 只做区间边缘，不在中间交易。
-- 信号K质量必须写：收盘位置/实体/影线/跟随四项（至少 3 项）。
 - 中性必须给两边条件（buy above X / sell below Y），不能只写“观望”。
-- 每个方向必须显式写 R:R = <数字>:1；R:R <1.5 不做。
-- 置信度上限 59；不要写 60+。
-- 概率用区间（40-60%），不给单点；不给没有数据支撑的百分比。
+- 每个方向必须显式写 R:R；R:R < 1.5 不做，PLAN 缺失时一律中性。
+- 置信度上限 59；概率用 40-60% 区间，不给单点。
 - 结构判断引用 ADX/EMA20/50/RSI/ATR%/vol_z/pos20，≤3 句。
 - 主力行为四选一（吸筹/拉升/派发/观望），证据 ≤2 条带价位。
-- 必须给触发/失效/目标；最后加一行“反方情景”。
-- 只在 setup + 信号K + R:R 同时满足时给方向；否则中性。
-- 结尾两行机器可读 SIGNAL：
+- 禁止 Markdown 表格；纯文本 ≤900 字。
+- 结尾两行机器可读 SIGNAL（不要用中文句子代替）：
   SIGNAL|BTC|<long|short|neutral>|4h|<0-100>|entry=<价>|stop=<价>|target=<价>
   SIGNAL|ETH|<long|short|neutral>|4h|<0-100>|entry=<价>|stop=<价>|target=<价>
-  不要用中文句子代替。
-- 纯文本 ≤900 字；结尾 SIGNAL 两行 + 非投资建议。
 - 直接输出正文；不要调用 message 工具；不要写“已推送”总结。

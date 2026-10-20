@@ -9,7 +9,8 @@ from nakedk.features import features_from_klines
 from nakedk.fetch import get_json
 
 from . import store
-from .detect import alert_text, detect_events
+from .detect import detect_events
+from .compose import compose_event
 
 
 def funding_rate(symbol: str) -> float | None:
@@ -81,7 +82,7 @@ def run_once(cfg: dict, db_path: str) -> list[dict]:
                 continue
             event_id = store.add_event(db_path, ev)
             cooldown = cfg["cooldown_min"].get(ev["severity"], 120) * 60_000
-            store.add_alert(db_path, event_id, ev["severity"], alert_text(ev), cooldown)
+            store.add_alert(db_path, event_id, ev["severity"], compose_event(ev), cooldown)
             out.append(ev)
 
     store.heartbeat(db_path, queue_depth=store.status(db_path)["pending"])

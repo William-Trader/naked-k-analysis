@@ -71,10 +71,10 @@ def stance(f: dict) -> dict:
     if atr:
         if direction == "long":
             stop = price - 1.5 * atr
-            target = price + 2.0 * atr
+            target = price + 3.0 * atr
         elif direction == "short":
             stop = price + 1.5 * atr
-            target = price - 2.0 * atr
+            target = price - 3.0 * atr
         else:
             stop = target = None
     else:
