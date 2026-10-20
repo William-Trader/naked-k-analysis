@@ -12,11 +12,13 @@ from urllib.parse import parse_qs, urlparse
 from nakedk.fetch import klines, ticker
 from nakedk.features import features_from_klines
 from nakedk.patterns import arbitrate, detect as detect_patterns
+from nakedk.pattern_tracker import states as pattern_states, track as track_patterns
 from nakedk.signals import stance
 from nakedk.trend import trend_score
 
 DB = os.environ.get("BEAGLE_DB", "/opt/naked-k-analysis/beagle.db")
 DRAWINGS = os.path.join(os.path.dirname(__file__), "..", "drawings.json")
+PATTERN_DB = os.environ.get("NK_PATTERN_DB", os.path.join(os.path.dirname(__file__), "..", "patterns.db"))
 CACHE_TTL = 60
 _cache = {}
 _lock = threading.Lock()
@@ -96,6 +98,10 @@ def build(interval="4h"):
                 ls.append((i, candles[i]["l"]))
         hs, ls = hs[-8:], ls[-8:]
         arb = arbitrate(detect_patterns(ks, f), f)
+        try:
+            track_patterns(sym, arb["patterns"], PATTERN_DB, f["price"])
+        except Exception:
+            pass
         out["symbols"][sym] = {
             "price": f["price"],
             "change24h": float(t["priceChangePercent"]),
@@ -120,6 +126,7 @@ def build(interval="4h"):
             "primary_pattern": arb["primary"],
             "secondary_pattern": arb["secondary"],
             "pattern_context": arb["context"],
+            "pattern_states": pattern_states(sym, PATTERN_DB, 8),
             "structure": structure_label(hs, ls),
         }
     try:
