@@ -92,10 +92,12 @@ def cmd_backtest(args) -> int:
         if folds > 1:
             rows.append(walk_forward(symbol, days=args.days, folds=folds,
                                      horizon=args.horizon, cost_bps=args.cost_bps,
-                                     intrabar=ib, gate=args.gate))
+                                     intrabar=ib, gate=args.gate,
+                                     tag_setups=args.tag_setups))
         else:
             rows.append(run(symbol, days=args.days, horizon=args.horizon,
-                            cost_bps=args.cost_bps, intrabar=ib, gate=args.gate))
+                            cost_bps=args.cost_bps, intrabar=ib, gate=args.gate,
+                            tag_setups=args.tag_setups))
     print(json.dumps(rows, ensure_ascii=False, indent=2))
     return 0
 
@@ -130,6 +132,8 @@ def build_parser() -> argparse.ArgumentParser:
                       help="round-trip fees+slippage in basis points")
     p_bt.add_argument("--no-intrabar", action="store_true",
                       help="skip 1h path simulation (faster, less honest)")
+    p_bt.add_argument("--tag-setups", action="store_true",
+                      help="tag every trade with its primary pattern for attribution")
     p_bt.add_argument("--gate", choices=["none", "quality", "quality_soft"], default="none",
                       help="extra entry gate for iteration")
     p_bt.set_defaults(func=cmd_backtest)
