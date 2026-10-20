@@ -91,7 +91,8 @@ def summarise(symbol: str) -> tuple[str, dict]:
     if any(v is not None for v in dv.values()):
         rate = dv.get("funding_rate")
         lines.append(
-            f"FUNDING|{base}|rate={fmt(rate * 100, 4) if rate is not None else 'NA'}%"
+            f"FUNDING|{base}|src={dv.get('source', 'none')}"
+            f"|rate={fmt(rate * 100, 4) if rate is not None else 'NA'}%"
             f"|oi={fmt(dv.get('open_interest'), 0) if dv.get('open_interest') is not None else 'NA'}"
             f"|oi_chg_24h={fmt(dv.get('oi_change_24h'), 2) if dv.get('oi_change_24h') is not None else 'NA'}%"
         )
