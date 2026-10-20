@@ -89,5 +89,19 @@
       "cum_return": -53.86,
       "max_drawdown": -74.1
     }
+  },
+  "cross_sectional": {
+    "universe": 25,
+    "loaded": 19,
+    "days": 730,
+    "verdict": "no robust edge: all train segments negative; validation positive is regime luck",
+    "top_validation": {
+      "lookback": 30,
+      "topk": 3,
+      "rebal": 30,
+      "train_total": -53.3,
+      "test_total": 12.8,
+      "test_sharpe": 2.15
+    }
   }
 }

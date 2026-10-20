@@ -34,3 +34,8 @@ the session log and Binance public data.
 ## Raw
 
 - `results.json` — the aggregated table used by the README.
+
+## Related research
+
+- [WALKFORWARD.md](WALKFORWARD.md) — 365d/730d single-symbol walk-forward (all negative)
+- [CROSS-SECTIONAL.md](CROSS-SECTIONAL.md) — top-N cross-sectional momentum (no robust edge)
