@@ -125,6 +125,12 @@ def _score(p, f, ks, atr):
             if (_f(last[4]) - _f(last[1])) * (_f(prev[4]) - _f(prev[1])) > 0:
                 sb += 1
     q += sb
+    if p.get("symmetry") is not None:
+        q += 6.0 * float(p["symmetry"])
+    if p.get("height") and atr:
+        q += min(6.0, 6.0 * float(p["height"]) / (5.0 * atr))
+    if p.get("type", "").startswith(("FLAG", "OBR")) and vz >= 1.5:
+        q += 4
     p["signal_bar"] = sb
     if p.get("target") and p.get("stop"):
         risk = abs(p["price"] - p["stop"])
@@ -267,6 +273,11 @@ def detect(ks, f):
         if rng < atr * 2.5 and (f.get("adx14") or 0) < 25:
             add("TR", "交易区间", "neutral", len(ks) - 1, p, "20根重叠，等突破确认")
 
+    try:
+        from .patterns_ext import extra_patterns
+        pats.extend(extra_patterns(ks, f))
+    except Exception:
+        pass
     pats = [_score(x, f, ks, atr) for x in pats]
     return pats
 
