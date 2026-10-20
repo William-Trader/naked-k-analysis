@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.request import Request, urlopen
 
 from .features import features_from_klines
+from .trend import trend_score
 
 BASE = "https://data-api.binance.vision"
 CST = timezone(timedelta(hours=8))
@@ -86,6 +87,9 @@ def summarise(symbol: str) -> tuple[str, dict]:
             ("ret4h", f["ret4h"]), ("ret24h", f["ret24h"]), ("ret72h", f["ret72h"]),
         ]
     ))
+    ts = trend_score(f)
+    lines.append(f"TREND|{base}|score={ts['score']}|label={ts['label']}|always_in={ts['always_in']}|ema={ts['components']['ema']}|adx={ts['components']['adx']}|pos={ts['components']['pos']}|mom={ts['components']['mom']}")
+    lines.append(f"trend: {ts['score']}/100 ({ts['label']}, Always-In={ts['always_in']})")
     lines.append("")
     lines.append("--- 4h candles (last 42, newest last) ---")
     lines.append("time (CST)        open       high       low        close      chg%    vol z")
