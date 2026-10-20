@@ -10,6 +10,7 @@
 | 04-smart-money.md | 吸筹/派发、筹码形态、Stop run/吸收/背离、7 问 |
 | 05-decision-tree.md | 9 步决策流程 + 置信度评分 + 禁止事项 |
 | 06-output-template.md | 机器人输出模板 + 真实示例 |
+| 07-ocr-distilled.md | 扫描书 OCR 提纯：崔海军/胡云生/许佳聪（异动、相对强弱、支撑质量、入场止损） |
 | playbook.json | 机器可读的规则/权重摘要 |
 
 ## 使用方式
