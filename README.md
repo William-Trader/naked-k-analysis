@@ -28,21 +28,67 @@ naked-k-analysis 是一个**零依赖的价格行为（裸K）分析与多频监
 
 ### 功能
 
-- **确定性分析**：EMA/ADX/RSI/ATR/量能 z/区间位置/摆动点全部用规则计算；LLM 只负责叙述。
-- **趋势评分 0–100**：EMA 排列 + ADX 强度 + 区间位置 + 24h 动量；输出 `TREND|...`，供机器人/前端统一使用。
-- **多频监测**：1m/5m 价格冲击、量能异常、区间突破、状态切换、资金费率极端。
-- **自动提醒**：P0/P1/P2 分级；P0 群+私聊，P1 群，P2 只进 4h 简报；冷却/静默/限流。
-- **默认 QQ 机器人**：通过 OpenClaw qqbot 通道推送；聊天「分析X」走价格行为框架。
-- **4h 完整简报**：市场周期 + Always-In + 结构数字 + 主力行为 + 关键位 + Setup + 信号K四项 + 触发/失效/目标/R:R + 反方情景 + SIGNAL。
-- **精美仪表盘**：暗色终端 UI，BTC/ETH 趋势评分、关键位、方向、事件流；60 秒刷新。
-- **闭环评分**：每条信号带 `SIGNAL|...`，`nakedk score` 用真实价格回算，供内部复盘。
-- **工程化**：零依赖、33 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署脚本。
+![仪表盘](docs/screenshots/dashboard.png)
+
+- **六层分析链**：单根K线编码 → 结构标注（BOS/CHoCH）→ 位置上下文 → 量价关系 → 多周期共振 → 信号K质量，逐层输出机器可读行，结论可追溯。
+- **单根K线编码**：实体占比、收盘位置、上下影线、range/body 相对 ATR、与前一根重叠、bar 类型、0–100 清晰度。
+- **结构标注**：ATR ZigZag 摆动点、HH/HL/LH/LL、BOS/CHoCH、结构状态机（up/down/range/transition）。
+- **多周期对齐**：1d/4h/1h 三档符号，alignment −3…+3；方向与对齐冲突的形态直接降权。
+- **量价与位置**：近似 VPOC/价值区/HVN、effort-vs-result、量价背离；距摆动位 ATR 距离、区间边缘分区、前日高低。
+- **信号K六维打分**：收盘位置、实体、影线、前一根跟随、位置、量能；低于 40 视为无效信号K。
+- **趋势评分 0–100**：EMA 排列 + ADX 强度 + 区间位置 + 24h 动量；输出 `TREND|...`。
+- **多频监测与提醒**：1m/5m 价格冲击、量能异常、区间突破、状态切换、资金费率；P0/P1/P2 分级，冷却/静默/限流，失败重试与死信。
+- **反馈闭环**：信号落库 → 到期评分（收益、命中、MFE/MAE、盘中先触止损还是目标）→ 分桶复盘（Wilson 区间、样本门槛）→ 自适应权重。
+- **系统自迭代**：按形态实测边缘调整置信度权重，单次最多 ±0.08、区间 [0.70, 1.30]、连续两次劣化自动隔离，全部变更留审计日志。
+- **仪表盘**：暗色终端 UI，双币卡片含 MTF/结构/BAR/信号K 徽章、趋势评分、关键位、方向与三价位、K线图（EMA/支撑阻力/摆动点/成交量）、事件流；支持滚轮缩放、拖拽、画线、全屏。
+- **工程化**：零依赖、80 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署。
+
+### 六层分析链
+
+| 层 | 模块 | 输出 |
+|---|---|---|
+| 单根K | `nakedk/bars.py` | `BAR` 行 |
+| 结构 | `nakedk/structure.py` | `STRUCT` 行 |
+| 多周期 | `nakedk/mtf.py` | `MTF` 行 |
+| 位置 | `nakedk/location.py` | `LOC` 行 |
+| 量价 | `nakedk/volume.py` | `VOLP` 行 |
+| 信号K | `nakedk/signalbar.py` | `SIGBAR` 行 |
+
+### 反馈闭环与自迭代
+
+```bash
+python -m beagle backfill --days 120   # 生成带标签的历史信号（source=engine_backfill）
+python -m beagle score                 # 到期评分：收益/命中/MFE/MAE/盘中先触
+python -m beagle review --apply        # 分桶复盘 + 写入自适应权重
+```
+
+实测（481 条回填样本，非实盘业绩）：
+
+```
+样本: 481 | 命中率 49.5% | Wilson [45.0, 53.9] | 期望 -0.009% | MFE 0.72 / MAE -0.66
+multipliers: DB=0.9478 DT=1.0774 IHS=0.9244 L1=0.92 L2=1.0468
+```
+
+> 回填样本用于验证链路与统计方法，不代表任何实盘收益；自适应权重有界、可回滚，每次变更记录在 `state/adaptive.json`。
+
+### 移动端
+
+<img src="docs/screenshots/mobile.png" width="360" alt="mobile dashboard">
+
 
 ### 系统组成
 
 | 路径 | 作用 |
 |---|---|
 | `nakedk/features.py` | EMA、ADX、RSI、ATR、量能 z、摆动点、区间位置 |
+| `nakedk/bars.py` | 单根K线编码（实体/影线/收盘位置/类型/清晰度） |
+| `nakedk/structure.py` | ATR ZigZag、HH/HL/LH/LL、BOS/CHoCH、结构状态 |
+| `nakedk/mtf.py` | 1d/4h/1h 多周期对齐 |
+| `nakedk/signalbar.py` | 信号K六维打分 |
+| `nakedk/volume.py` | VPOC/价值区、effort-vs-result、量价背离 |
+| `nakedk/location.py` | 距摆动位 ATR、区间边缘、前日高低 |
+| `nakedk/stats.py` | Wilson 区间、分桶统计、样本门槛 |
+| `nakedk/calibration.py` | 置信度分桶校准 |
 | `nakedk/trend.py` | 0–100 趋势评分 + Always-In |
 | `nakedk/signals.py` | 确定性方向 + 防线 + 止损/目标 |
 | `nakedk/fetch.py` | Binance 公共数据 + 文本摘要 + TREND 行 |
@@ -52,6 +98,8 @@ naked-k-analysis 是一个**零依赖的价格行为（裸K）分析与多频监
 | `beagle/monitor.py` | 快照 → 特征 → 事件 → SQLite |
 | `beagle/push.py` | 待推送告警 → QQ |
 | `beagle/replay.py` | 历史事件校准 |
+| `beagle/review.py` | 分桶复盘 + 自适应权重写回 |
+| `beagle/adaptive.py` | 有界、可审计的权重调整 |
 | `dashboard/` | 零依赖仪表盘 API + 暗色前端 |
 | `knowledge/` | 9 个价格行为模块 |
 | `deploy/` | systemd 单元：monitor / push / dashboard |
@@ -175,6 +223,10 @@ L6 反馈      SIGNAL → 结果评分 → 校准
 
 ### Overview
 
+![dashboard](docs/screenshots/dashboard.png)
+
+**What it does**: encodes every candle, labels market structure (BOS/CHoCH), scores the signal bar on six dimensions, checks 1d/4h/1h alignment, adds volume profile and location context, then records every signal, scores it at the horizon (including MFE/MAE and whether the stop or the target was touched first), and adjusts per-setup weights within hard bounds.
+
 naked-k-analysis is a **zero-dependency price-action analysis and multi-frequency monitoring toolkit**. It does not execute trades and makes no prediction claims. It distils the Al Brooks framework into executable rules and produces structured, reviewable analysis.
 
 It has three layers:
@@ -193,7 +245,7 @@ It has three layers:
 - **4h briefing**: market cycle + always-in + structure numbers + smart-money evidence + key levels + setup + signal-bar quality + trigger/invalidation/target/R:R + counter-scenario + SIGNAL.
 - **Dashboard**: a dark terminal UI with BTC/ETH trend scores, key levels, stance and event feed; refreshes every 60 seconds.
 - **Closed loop**: each signal carries a `SIGNAL|...` line; `nakedk score` replays it against real prices.
-- **Engineering**: zero dependencies, 33 unit tests, GitHub Actions, Dockerfile, Makefile, systemd, one-click bootstrap.
+- **Engineering**: zero dependencies, 80 unit tests, GitHub Actions, Dockerfile, Makefile, systemd, one-click bootstrap.
 
 ### Quickstart (one-click)
 
@@ -295,7 +347,7 @@ Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ### Engineering
 
 - Zero third-party dependencies (Python standard library + SQLite)
-- 33 unit tests; GitHub Actions (3.10/3.12/3.13)
+- 80 unit tests; GitHub Actions (3.10/3.12/3.13)
 - Dockerfile, Makefile, systemd units
 - `bootstrap.sh` one-click deployment; `AGENT-SETUP.md` step-by-step for agents
 
