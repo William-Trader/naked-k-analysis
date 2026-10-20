@@ -140,6 +140,20 @@ sudo systemctl enable --now beagle-monitor beagle-push.timer
 
 Binance public endpoints (`data-api.binance.vision`). No API key required.
 
+## What this is / is not
+
+**It is:**
+
+- a deterministic price-action analysis engine;
+- a multi-frequency event monitor;
+- a structured briefing generator with a review rubric.
+
+**It is not:**
+
+- a trading executor;
+- a prediction engine with a validated edge;
+- investment advice.
+
 ## Scope and disclaimer
 
 This is an analysis and monitoring toolkit, not a trading system. It does not execute orders and makes **no historical performance claims**. Outputs are technical readings of price action and are **not investment advice**.
