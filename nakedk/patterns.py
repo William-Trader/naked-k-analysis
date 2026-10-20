@@ -9,6 +9,8 @@ secondary patterns are the only ones a trader should act on.
 """
 from __future__ import annotations
 
+import math
+
 BASE = {
     "DB": 60, "DT": 60, "HS": 65, "IHS": 65,
     "WEDGE_TOP": 60, "WEDGE_BOTTOM": 60,
@@ -306,6 +308,15 @@ def arbitrate(pats, f):
             if x["direction"] != primary["direction"] or x["type"] != primary["type"]:
                 secondary = x
                 break
+    if primary:
+        atr_val = f.get("atr14") or 0.0
+        same = [x for x in pats if x is not primary
+                and x.get("direction") == primary.get("direction")
+                and (not atr_val or abs(x.get("price", 0) - primary.get("price", 0)) <= 0.5 * atr_val)]
+        k = 1 + len(same)
+        if k > 1:
+            primary["score"] = round(primary["score"] * (1 + 0.15 * math.log2(k)), 1)
+            primary["confluence"] = k
     for x in pats:
         x["role"] = "primary" if x is primary else ("secondary" if x is secondary else "suppressed")
     return {"context": ctx, "primary": primary, "secondary": secondary, "patterns": pats}

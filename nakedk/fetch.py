@@ -31,6 +31,9 @@ from .micro import analyse as micro_analyse
 from .volstruct import analyse as volstruct_analyse
 from .cross import analyse as cross_analyse
 from .trades import trades as trades_analyse, book as book_analyse
+from . import always_in as ai_state
+from .legs import decompose as leg_decompose, maturity as leg_maturity, exhaustion as leg_exhaustion
+from .quality import gates as data_gates
 from .signalbar import score as signalbar_score
 
 BASE = "https://data-api.binance.vision"
@@ -273,12 +276,21 @@ def summarise(symbol: str) -> tuple[str, dict]:
         except Exception:
             pass
         try:
-            tr = trades_analyse(symbol)
+            tr = trades_analyse(symbol, atr_value=stc.get("atr"),
+                                bar_range=(bar or {}).get("range"))
             if tr:
                 lines.append(
                     f"TRADES|{base}|n={tr['n']}|delta={tr['delta']}|avg={tr['avg']}"
                     f"|max={tr['max']}|big={tr['big']}"
                 )
+                for sw in (tr.get("sweeps") or [])[-2:]:
+                    lines.append(
+                        f"SWEEP|{base}|side={sw['side']}|trades={sw['trades']}"
+                        f"|move_atr={sw['move_atr']}|quote={sw['quote']}"
+                    )
+                ab = tr.get("absorb")
+                if ab:
+                    lines.append(f"ABSORB|{base}|count={ab['count']}|quote={ab['quote']}")
         except Exception:
             pass
         try:
@@ -303,6 +315,36 @@ def summarise(symbol: str) -> tuple[str, dict]:
                 lines.append(
                     f"FOLLOW|{base}|dir={pdir0}|ok={int(ft['ok'])}|close_pos={ft['close_pos']}"
                 )
+        try:
+            ai_path = os.environ.get("NK_AI_DB") or os.path.join(
+                os.path.dirname(os.environ.get("NK_PATTERN_DB") or
+                               os.path.join(os.path.dirname(__file__), "..", "patterns.db")),
+                "ai_state.db")
+            ai = ai_state.update(ai_path, symbol, (stc.get("bos") or {}).get("kind"),
+                                 bool((ft or {}).get("ok")), f["price"], f.get("ema20"),
+                                 int(k4[-1][0]))
+            lines.append(
+                f"AI|{base}|state={ai['state']}|prev={ai['prev']}|since={ai['since_ts']}"
+                f"|reason={ai['reason']}"
+            )
+        except Exception:
+            pass
+        try:
+            legs = leg_decompose([float(x[2]) for x in k4], [float(x[3]) for x in k4],
+                                 stc.get("atr"))
+            if legs:
+                lines.append(
+                    f"LEGS|{base}|count={len(legs)}|maturity={leg_maturity(legs)}"
+                    f"|exhaustion={int(leg_exhaustion(legs))}"
+                    f"|last_atr={legs[-1]['delta_atr']}|dir={legs[-1]['dir']}"
+                )
+        except Exception:
+            pass
+        try:
+            dq = data_gates(k4, 14_400_000, int(__import__("time").time() * 1000))
+            lines.append(f"DATA|{base}|ok={int(dq['ok'])}|issues={';'.join(dq['issues']) or 'none'}")
+        except Exception:
+            pass
         plan = plan_from_context(f["price"], prim.get("direction"), stc,
                                  stc.get("atr"), pattern=prim)
         if plan:
