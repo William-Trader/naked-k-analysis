@@ -112,6 +112,13 @@ nakedk.signals    deterministic stance + guards + levels
 
 > 目标不是比谁的星多，而是在“价格行为”这个细分里，把**证据、可复现、零依赖**做到最好。
 
+
+## 架构 v2 / Architecture
+
+- 设计推导与分层：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- 多频监测服务：`beagle/`（1m/5m 事件 → SQLite → 4h 简报）
+- 部署单元：`deploy/beagle-monitor.service`
+
 ## 数据源 / Data
 
 Binance 公共端点 `data-api.binance.vision`，无需 API Key。

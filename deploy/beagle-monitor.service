@@ -1,0 +1,17 @@
+[Unit]
+Description=Beagle price-action market monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/naked-k-analysis/beagle-app
+Environment=BEAGLE_CONFIG=/opt/naked-k-analysis/beagle-app/config/beagle.json
+ExecStart=/usr/bin/python3 -m beagle monitor --config /opt/naked-k-analysis/beagle-app/config/beagle.json
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
