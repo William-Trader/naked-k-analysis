@@ -24,6 +24,13 @@ openclaw cron get <job-id> | head -40
 
 只改 prompt，不动 cron 表达式与投递目标。
 
+> 仓库模板里的 `/opt/naked-k-analysis/...` 是规范部署路径；如果实际路径不同（例如 `/home/ubuntu/nakedk-dashboard`），先做一次替换再写入：
+> ```bash
+> sed 's#/opt/naked-k-analysis/nakedk-dashboard#/home/ubuntu/nakedk-dashboard#g' \
+>   prompts/pa_agent_msg.txt > /tmp/live_prompt.txt
+> openclaw cron edit <job-id> --message "$(cat /tmp/live_prompt.txt)"
+> ```
+
 ## 验收
 
 ```bash
