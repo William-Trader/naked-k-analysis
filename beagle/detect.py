@@ -24,16 +24,19 @@ def detect_events(symbol, features, close_1m, prev_close_1m, vol_z_1m,
     atr = features.get("atr14") or 0.0
     price = features.get("price") or close_1m or 0.0
 
-    if atr and prev_close_1m:
+    if prev_close_1m:
         move = close_1m - prev_close_1m
-        ratio = abs(move) / atr
+        move_pct = move / prev_close_1m * 100.0
+        ratio = (abs(move) / atr) if atr else 0.0
         direction = "up" if move > 0 else "down"
-        if ratio >= th.get("extreme_shock_atr", 2.0):
+        pct_shock = th.get("price_shock_pct", 0.5)
+        pct_ext = th.get("extreme_pct", 1.5)
+        if ratio >= th.get("extreme_shock_atr", 2.0) or abs(move_pct) >= pct_ext:
             events.append(_ev(ts, symbol, "price_shock_extreme", "P0", direction, close_1m,
-                              move_pct=(move / prev_close_1m * 100), atr_ratio=ratio))
-        elif ratio >= th.get("price_shock_atr", 0.8):
+                              move_pct=move_pct, atr_ratio=ratio))
+        elif ratio >= th.get("price_shock_atr", 0.8) or abs(move_pct) >= pct_shock:
             events.append(_ev(ts, symbol, "price_shock", "P1", direction, close_1m,
-                              move_pct=(move / prev_close_1m * 100), atr_ratio=ratio))
+                              move_pct=move_pct, atr_ratio=ratio))
 
     if vol_z_1m is not None and vol_z_1m >= th.get("vol_z", 3.0):
         events.append(_ev(ts, symbol, "volume_spike", "P1", None, close_1m,

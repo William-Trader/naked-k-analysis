@@ -53,6 +53,20 @@ def cmd_score(args):
     return 0
 
 
+def cmd_replay(args):
+    from .replay import replay, summarise
+    cfg = _cfg(args.config)
+    all_events = []
+    for symbol in (args.symbols or cfg["symbols"]):
+        all_events.extend(replay(symbol, args.days, cfg))
+    print(json.dumps({
+        "symbols": args.symbols or cfg["symbols"],
+        "days": args.days,
+        **summarise(all_events, cfg.get("cooldown_min")),
+    }, ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser():
     p = argparse.ArgumentParser(prog="beagle", description="Beagle market monitor")
     sub = p.add_subparsers(dest="command", required=True)
@@ -61,6 +75,12 @@ def build_parser():
         s = sub.add_parser(name)
         s.add_argument("--config")
         s.set_defaults(func=func)
+    p_replay = sub.add_parser("replay")
+    p_replay.add_argument("--config")
+    p_replay.add_argument("--days", type=float, default=1.0)
+    p_replay.add_argument("--symbols", nargs="*")
+    p_replay.set_defaults(func=cmd_replay)
+
     p_push = sub.add_parser("push")
     p_push.add_argument("--config")
     p_push.add_argument("--limit", type=int, default=20)
