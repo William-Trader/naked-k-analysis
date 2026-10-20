@@ -23,7 +23,11 @@ from .bars import profile_series, closed_bars
 from .structure import structure as structure_of
 from .mtf import alignment as mtf_alignment
 from .volume import vpoc, effort_result, divergence
-from .location import atr_distance, edge_zone, session_levels
+from .location import atr_distance, edge_zone, session_levels, plan_from_context
+from .flow import analyse as flow_analyse, classify as flow_classify
+from .micro import analyse as micro_analyse
+from .volstruct import analyse as volstruct_analyse
+from .cross import analyse as cross_analyse
 from .signalbar import score as signalbar_score
 
 BASE = "https://data-api.binance.vision"
@@ -217,6 +221,53 @@ def summarise(symbol: str) -> tuple[str, dict]:
             lines.append(
                 f"SIGBAR|{base}|dir={pdir}|score={sbs['score']}|{parts_s}|missing={miss_s}"
             )
+        fl = flow_analyse(k4)
+        if fl:
+            shape = flow_classify(bar, fl.get("delta", 0.0))
+            lines.append(
+                f"FLOW|{base}|delta={fl['delta']}|cum20={fl['cum_delta']}"
+                f"|pchg={fl['price_chg']}|div={fl['divergence']}|shape={shape}"
+            )
+        try:
+            m5 = closed_bars(klines(symbol, "5m", 200), "5m")
+            m1 = closed_bars(klines(symbol, "1m", 60), "1m")
+            mi = micro_analyse(m5, m1)
+            if mi:
+                lines.append(
+                    f"MICRO|{base}|state5m={mi.get('state5m')}|bos5m={mi.get('bos5m')}"
+                    f"|sign5m={mi.get('sign5m')}|impulse1m={mi.get('impulse_1m')}"
+                )
+        except Exception:
+            pass
+        try:
+            vs = volstruct_analyse([float(x[2]) for x in k4],
+                                   [float(x[3]) for x in k4],
+                                   [float(x[4]) for x in k4])
+            if vs:
+                lines.append(
+                    f"VOLS|{base}|atr_pct={vs['atr_percentile']}|ratio={vs['ratio']}"
+                    f"|state={vs['state']}|rv={vs['rv']}"
+                )
+        except Exception:
+            pass
+        try:
+            cr = cross_analyse(closed_bars(klines("BTCUSDT", "1d", 40), "1d"),
+                               closed_bars(klines("ETHUSDT", "1d", 40), "1d"),
+                               closed_bars(klines("ETHBTC", "1d", 80), "1d"))
+            if cr:
+                lines.append(
+                    f"CROSS|{base}|corr30={cr.get('corr_30d')}|btc30={cr.get('btc_30d')}"
+                    f"|eth30={cr.get('eth_30d')}|rs={cr.get('relative_strength')}"
+                    f"|ethbtc={cr.get('ethbtc_trend', 'NA')}"
+                )
+        except Exception:
+            pass
+        plan = plan_from_context(f["price"], prim.get("direction"), stc, stc.get("atr"))
+        if plan:
+            lines.append("PLAN|" + base + "|" + "|".join(
+                f"{k}={v}" for k, v in plan.items()))
+        elif prim.get("direction") in ("bullish", "bearish"):
+            lines.append(f"PLAN|{base}|status=reject|reason=rr_below_1.5")
     except Exception as e:
         lines.append(f"BAR_ERR|{base}|{str(e)[:80]}")
     lines.append("")
