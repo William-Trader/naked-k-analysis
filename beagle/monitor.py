@@ -74,6 +74,8 @@ def run_once(cfg: dict, db_path: str) -> list[dict]:
         )
         store.set_state(db_path, symbol, snap["features"].get("trend"))
         for ev in events:
+            if ev["severity"] != "P0" and ev.get("quality", 50) < cfg.get("thresholds", {}).get("min_quality", 40):
+                continue
             if store.recent_alert_exists(db_path, ev["symbol"], ev["kind"],
                                          ev["direction"], now):
                 continue

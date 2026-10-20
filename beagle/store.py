@@ -93,6 +93,14 @@ def init(path: str) -> None:
     conn = connect(path)
     try:
         conn.executescript(SCHEMA)
+        cols = [r[1] for r in conn.execute("PRAGMA table_info(alerts)").fetchall()]
+        for col, ddl in (
+            ("attempts", "ALTER TABLE alerts ADD COLUMN attempts INTEGER DEFAULT 0"),
+            ("last_error", "ALTER TABLE alerts ADD COLUMN last_error TEXT"),
+            ("next_attempt_at", "ALTER TABLE alerts ADD COLUMN next_attempt_at INTEGER DEFAULT 0"),
+        ):
+            if col not in cols:
+                conn.execute(ddl)
         conn.commit()
     finally:
         conn.close()
@@ -151,7 +159,9 @@ def pending_alerts(path: str, limit: int = 20) -> list[dict]:
     conn = connect(path)
     try:
         rows = conn.execute(
-            "SELECT * FROM alerts WHERE status = 'pending' ORDER BY id ASC LIMIT ?", (limit,)
+            "SELECT * FROM alerts WHERE status = 'pending' "
+            "AND (next_attempt_at IS NULL OR next_attempt_at <= ?) ORDER BY id ASC LIMIT ?",
+            (_now(), limit),
         ).fetchall()
         return [dict(r) for r in rows]
     finally:
@@ -163,6 +173,24 @@ def mark_sent(path: str, alert_id: int) -> None:
     try:
         conn.execute("UPDATE alerts SET status='sent', sent_at=? WHERE id=?", (_now(), alert_id))
         conn.commit()
+    finally:
+        conn.close()
+
+
+def fail_alert(path: str, alert_id: int, err: str, max_attempts: int = 5) -> dict:
+    now = _now()
+    conn = connect(path)
+    try:
+        row = conn.execute("SELECT attempts FROM alerts WHERE id = ?", (alert_id,)).fetchone()
+        attempts = ((row["attempts"] or 0) if row else 0) + 1
+        status = "failed" if attempts >= max_attempts else "pending"
+        next_at = now + min(2 ** attempts, 60) * 60_000
+        conn.execute(
+            "UPDATE alerts SET attempts = ?, last_error = ?, status = ?, next_attempt_at = ? WHERE id = ?",
+            (attempts, err[:500], status, next_at, alert_id),
+        )
+        conn.commit()
+        return {"attempts": attempts, "status": status, "next_attempt_at": next_at}
     finally:
         conn.close()
 

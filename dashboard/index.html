@@ -117,11 +117,13 @@ function drawChart(sym){
     ctx.fillText(lab,Math.max(2,Math.min(tx-20,w-padR-36)),h-padB+14);
   }
   // volume
+  if(st.showVol){
   var maxV=Math.max.apply(null,vis.map(function(x){return x.v;}))||1;
   for(var i=0;i<m;i++){
     var vh=vis[i].v/maxV*volH;
     ctx.fillStyle=vis[i].c>=vis[i].o?'rgba(255,91,110,.35)':'rgba(53,208,127,.35)';
     ctx.fillRect(X(start+i)-xw*0.32,h-padB-vh,xw*0.64,vh);
+  }
   }
   // candles
   for(var i=0;i<m;i++){
@@ -142,7 +144,7 @@ function drawChart(sym){
     }
     ctx.stroke();
   }
-  poly(s.ema20_series,'#d9b45b');poly(s.ema50_series,'#5aa9ff');
+  if(st.showEma){poly(s.ema20_series,'#d9b45b');poly(s.ema50_series,'#5aa9ff');}
   // levels
   function hline(p,color,label){
     if(!p)return;var y=Y(p);
@@ -261,7 +263,7 @@ function card(sym,s){
     +'<div class="levels">支撑 <b>'+fmt(s.r20_lo,1)+'</b> / '+fmt((s.swing_lows||[]).slice(-1)[0]||s.low24h,1)+' · 阻力 <b>'+fmt(s.r20_hi,1)+'</b> / '+fmt((s.swing_highs||[]).slice(-1)[0]||s.high24h,1)+'</div>'
     +'<div class="sig">'+sig+'</div>'
     +'<div style="margin-top:7px;font-size:11px;color:var(--muted)">结构：'+(s.structure||'—')+' · 形态：'+pats+'</div>'
-    +'<div class="tools"><button data-mode="hline">水平线</button><button data-mode="trend">趋势线</button><button data-mode="clear">清除画线</button><button data-full="1">全屏</button></div>'
+    +'<div class="tools"><button data-ind="ema" class="on">EMA</button><button data-ind="vol" class="on">VOL</button><button data-mode="hline">水平线</button><button data-mode="trend">趋势线</button><button data-mode="clear">清除画线</button><button data-full="1">全屏</button></div>'
     +'<div class="chart-wrap"><div class="ohlc" id="ohlc-'+sym+'"></div><canvas class="chart" data-sym="'+sym+'"></canvas></div>'
     +'<div class="hint">滚轮缩放 · 拖拽平移 · 双击全屏 · 十字线 OHLC</div>'
     +'</article>';
@@ -272,7 +274,7 @@ function render(){
   g.innerHTML=keys.map(function(k){return card(k,DATA.symbols[k]);}).join('');
   keys.forEach(function(sym){
     var s=DATA.symbols[sym],n=s.candles.length;
-    CH[sym]={s:s,view:{start:Math.max(0,n-80),end:n},hover:-1,hoverY:null,mode:'none',p1:null,lines:loadLines(sym)};
+    CH[sym]={s:s,view:{start:Math.max(0,n-80),end:n},hover:-1,hoverY:null,mode:'none',p1:null,lines:loadLines(sym),showEma:true,showVol:true};
     bind(sym);drawChart(sym);
     fetch('/api/drawings?symbol='+sym).then(function(r){return r.json();}).then(function(lines){if(lines&&lines.length){CH[sym].lines=lines;drawChart(sym);}}).catch(function(){});
     var root=document.querySelector('canvas.chart[data-sym="'+sym+'"]').closest('.card');
@@ -281,6 +283,15 @@ function render(){
         var m=b.getAttribute('data-mode');
         if(m==='clear'){CH[sym].lines=[];saveLines(sym,[]);CH[sym].mode='none';syncTools(sym);drawChart(sym);return;}
         CH[sym].mode=(CH[sym].mode===m?'none':m);CH[sym].p1=null;syncTools(sym);
+      });
+    });
+    root.querySelectorAll('[data-ind]').forEach(function(b){
+      b.addEventListener('click',function(){
+        var k=b.getAttribute('data-ind');
+        if(k==='ema')CH[sym].showEma=!CH[sym].showEma;
+        if(k==='vol')CH[sym].showVol=!CH[sym].showVol;
+        b.classList.toggle('on',k==='ema'?CH[sym].showEma:CH[sym].showVol);
+        drawChart(sym);
       });
     });
     root.querySelector('[data-full]').addEventListener('click',function(){if(root.requestFullscreen)root.requestFullscreen();});

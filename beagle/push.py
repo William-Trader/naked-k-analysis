@@ -32,12 +32,17 @@ def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20
         try:
             p = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
         except Exception as e:
-            results.append({"id": a["id"], "status": "error", "err": str(e)[:200]})
+            err = str(e)[:200]
+            info = store.fail_alert(db_path, a["id"], err, cfg.get("max_push_attempts", 5))
+            results.append({"id": a["id"], "status": info["status"],
+                            "attempts": info["attempts"], "err": err})
             continue
         if p.returncode == 0:
             store.mark_sent(db_path, a["id"])
             results.append({"id": a["id"], "status": "sent"})
         else:
-            results.append({"id": a["id"], "status": "error",
-                            "err": (p.stderr or p.stdout)[:200]})
+            err = (p.stderr or p.stdout)[:200]
+            info = store.fail_alert(db_path, a["id"], err, cfg.get("max_push_attempts", 5))
+            results.append({"id": a["id"], "status": info["status"],
+                            "attempts": info["attempts"], "err": err})
     return results

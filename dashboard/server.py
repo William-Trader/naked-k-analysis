@@ -19,6 +19,7 @@ from nakedk.trend import trend_score
 DB = os.environ.get("BEAGLE_DB", "/opt/naked-k-analysis/beagle.db")
 DRAWINGS = os.path.join(os.path.dirname(__file__), "..", "drawings.json")
 PATTERN_DB = os.environ.get("NK_PATTERN_DB", os.path.join(os.path.dirname(__file__), "..", "patterns.db"))
+TOKEN = os.environ.get("NK_DASH_TOKEN", "")
 CACHE_TTL = 60
 _cache = {}
 _lock = threading.Lock()
@@ -153,8 +154,21 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _authorized(self, q):
+        if not TOKEN:
+            return True
+        if self.headers.get("Authorization", "") == "Bearer " + TOKEN:
+            return True
+        return (q.get("token") or [""])[0] == TOKEN
+
     def do_GET(self):
         q = parse_qs(urlparse(self.path).query)
+        if not self._authorized(q):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", "Bearer")
+            self.end_headers()
+            self.wfile.write(b"unauthorized")
+            return
         if urlparse(self.path).path == "/api/drawings":
             sym = (q.get("symbol") or [""])[0]
             self._send(json.dumps(load_drawings().get(sym, []), ensure_ascii=False).encode("utf-8"),
@@ -170,6 +184,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(fh.read(), "text/html; charset=utf-8")
 
     def do_POST(self):
+        q = parse_qs(urlparse(self.path).query)
+        if not self._authorized(q):
+            self.send_response(401)
+            self.send_header("WWW-Authenticate", "Bearer")
+            self.end_headers()
+            self.wfile.write(b"unauthorized")
+            return
         if urlparse(self.path).path != "/api/drawings":
             self.send_response(404)
             self.end_headers()
