@@ -1,14 +1,15 @@
 价格行为简报任务（直接执行，不要反问）：
 
-1. 运行 exec: python3 /opt/naked-k-analysis/pa_fetch.py BTCUSDT ETHUSDT
-2. 运行 exec: cat /opt/naked-k-analysis/pa_knowledge/05-decision-tree.md /opt/naked-k-analysis/pa_knowledge/08-albrooks-deep.md /opt/naked-k-analysis/pa_knowledge/09-review-rubric.md
-3. 按 08 的 12 问检查表分析，按 06 的模板输出。
+1. 运行 exec: python3 /opt/naked-k-analysis/nakedk-dashboard/pa_fetch.py BTCUSDT ETHUSDT
+2. 运行 exec: cat /opt/naked-k-analysis/nakedk-dashboard/knowledge/05-decision-tree.md /opt/naked-k-analysis/nakedk-dashboard/knowledge/08-albrooks-deep.md /opt/naked-k-analysis/nakedk-dashboard/knowledge/09-review-rubric.md
+3. 按 08 的 12 问检查表分析，按 06 模板输出。
 
 硬性规则：
 - 先写高周期方向 + 市场周期阶段（突破/紧通道/宽通道/区间）+ Always-In。
-- **每轮必须写 Always-In（Always-In = 多/空/中性）；漏写视为不合格。**
+- 必须读取并引用数据中的 **TREND** 和 **PATTERN** 行；PATTERN 是形态候选，至少引用一个（没有就写“无标准形态”）。
+- 每轮必须写 Always-In（Always-In = 多/空/中性）；漏写视为不合格。
 - 方向只允许 多/空/中性；周期固定 4h；不做 24h 方向预测。
-- **每个币必须写 Setup；没有就写“无标准 setup”。**
+- 每个币必须写 Setup；没有就写“无标准 setup”。
 - DT/MTR 不得直接给方向；必须等确认（趋势线破 + HL/LH + 强反转K），否则中性。
 - BLSHS 只做区间边缘，不在中间交易。
 - 信号K质量必须写：收盘位置/实体/影线/跟随四项（至少 3 项）。
