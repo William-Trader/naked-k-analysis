@@ -89,6 +89,32 @@ def _fit(p, ctx, f):
     return 0.5
 
 
+def _stage(x, price, atr, ks=None):
+    d = x.get("direction")
+    target, neck = x.get("target"), x.get("neckline")
+    if target and d == "bullish" and price >= target:
+        return "target"
+    if target and d == "bearish" and price <= target:
+        return "target"
+    if neck and d == "bullish" and price > neck:
+        return "breakout"
+    if neck and d == "bearish" and price < neck:
+        return "breakout"
+    if neck and atr and ks:
+        idx = x.get("index")
+        if idx is not None and 0 <= idx < len(ks):
+            after = ks[idx + 1:]
+            if d == "bullish":
+                broke = any(float(k[4]) > neck for k in after)
+                if broke and price < neck - 0.5 * atr:
+                    return "failed"
+            elif d == "bearish":
+                broke = any(float(k[4]) < neck for k in after)
+                if broke and price > neck + 0.5 * atr:
+                    return "failed"
+    return "forming"
+
+
 def _score(p, f, ks, atr):
     q = BASE.get(p["type"], 50)
     vz = f.get("vol_z") or 0.0
@@ -144,6 +170,9 @@ def _score(p, f, ks, atr):
                 q += 6
             elif rr < 1:
                 q -= 10
+    mult = float((f.get("pattern_mult") or {}).get(p["type"], 1.0))
+    q *= max(0.85, min(1.15, mult))
+    p["stage"] = p.get("stage") or "forming"
     p["quality"] = max(0, min(100, round(q)))
     return p
 
@@ -278,6 +307,8 @@ def detect(ks, f):
         pats.extend(extra_patterns(ks, f))
     except Exception:
         pass
+    for x in pats:
+        x["stage"] = _stage(x, p, atr, ks)
     pats = [_score(x, f, ks, atr) for x in pats]
     return pats
 

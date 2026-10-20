@@ -164,6 +164,26 @@ def summarise(symbol: str) -> tuple[str, dict]:
                 f"{k}={v}" for k, v in sorted(mults.items())))
     except Exception:
         pass
+    try:
+        from .pattern_calibration import load as load_pcal
+        cands = []
+        if os.environ.get("NK_PATTERN_QUALITY"):
+            cands.append(os.environ["NK_PATTERN_QUALITY"])
+        for env in ("NK_CALIB_DB", "BEAGLE_DB"):
+            if os.environ.get(env):
+                cands.append(os.path.join(os.path.dirname(os.environ[env]),
+                                          "state", "pattern_quality.json"))
+        here = os.path.dirname(os.path.abspath(__file__))
+        cands += [os.path.join(here, "..", "state", "pattern_quality.json"),
+                  os.path.join(here, "..", "..", "beagle-app", "state", "pattern_quality.json")]
+        mults = {}
+        for path in cands:
+            mults = load_pcal(path)
+            if mults:
+                break
+        f["pattern_mult"] = mults
+    except Exception:
+        pass
     arb = arbitrate(detect_patterns(k4, f), f)
     prim = arb["primary"] or {}
     sec = arb["secondary"] or {}
