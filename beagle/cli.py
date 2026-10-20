@@ -149,6 +149,27 @@ def cmd_record(args):
     return 0
 
 
+def cmd_calibrate_patterns(args):
+    from nakedk.pattern_calibration import save
+    from nakedk.stats import bucket
+    from .review import load_rows
+    cfg = _cfg(args.config)
+    store.init(cfg["db_path"])
+    rows = load_rows(cfg["db_path"])
+    by = bucket(rows, lambda r: r.get("setup") or "NONE")
+    mults = {}
+    for k, v in by.items():
+        if v.get("n", 0) >= 30 and v.get("hit_rate") is not None:
+            m = 1 + 0.5 * (v["hit_rate"] - 50) / 50
+            mults[k] = round(max(0.85, min(1.15, m)), 3)
+    path = os.path.join(os.path.dirname(cfg["db_path"]) or ".",
+                        "state", "pattern_quality.json")
+    save(path, mults, len(rows))
+    print(json.dumps({"path": path, "multipliers": mults, "n": len(rows)},
+                     ensure_ascii=False))
+    return 0
+
+
 def cmd_review(args):
     from .review import build, render
     cfg = _cfg(args.config)
@@ -251,6 +272,10 @@ def build_parser():
     p_record.add_argument("--config")
     p_record.add_argument("--symbols", nargs="*")
     p_record.set_defaults(func=cmd_record)
+
+    p_cal = sub.add_parser("calibrate-patterns")
+    p_cal.add_argument("--config")
+    p_cal.set_defaults(func=cmd_calibrate_patterns)
 
     p_review = sub.add_parser("review")
     p_review.add_argument("--config")

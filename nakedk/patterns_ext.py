@@ -131,4 +131,48 @@ def extra_patterns(ks, f):
                                 "stop": max(b["h"] for b in pb),
                                 "target": lo - (hi - lo),
                                 "height": hi - lo, "symmetry": round(1 - retr, 2)})
+    # Measured move: two equal legs in the same direction.
+    try:
+        from .structure import zigzag
+        highs = [_f(k[2]) for k in ks]
+        lows = [_f(k[3]) for k in ks]
+        piv = zigzag(highs, lows, atr, 0.5)
+        if len(piv) >= 4:
+            a, b, c, d = piv[-4], piv[-3], piv[-2], piv[-1]
+            if a["kind"] == "L" and b["kind"] == "H" and c["kind"] == "L" and d["kind"] == "H":
+                leg1, leg2 = b["p"] - a["p"], d["p"] - c["p"]
+                if leg1 > 0 and leg2 > 0 and abs(leg2 - leg1) / leg1 <= 0.25 and d["p"] > b["p"]:
+                    out.append({"type": "MM_UP", "label": "测量移动（上）",
+                                "direction": "bullish", "index": d["i"], "price": d["p"],
+                                "note": "两段等长上涨，第二段完成",
+                                "stop": c["p"] - 0.3 * atr, "target": d["p"] + leg2,
+                                "height": leg2, "symmetry": round(1 - abs(leg2 - leg1) / leg1, 2)})
+            elif a["kind"] == "H" and b["kind"] == "L" and c["kind"] == "H" and d["kind"] == "L":
+                leg1, leg2 = a["p"] - b["p"], c["p"] - d["p"]
+                if leg1 > 0 and leg2 > 0 and abs(leg2 - leg1) / leg1 <= 0.25 and d["p"] < b["p"]:
+                    out.append({"type": "MM_DOWN", "label": "测量移动（下）",
+                                "direction": "bearish", "index": d["i"], "price": d["p"],
+                                "note": "两段等长下跌，第二段完成",
+                                "stop": c["p"] + 0.3 * atr, "target": d["p"] - leg2,
+                                "height": leg2, "symmetry": round(1 - abs(leg2 - leg1) / leg1, 2)})
+    except Exception:
+        pass
+
+    # Final flag: a tight flag at the end of a mature trend.
+    try:
+        from .legs import decompose, maturity
+        legs = decompose([_f(k[2]) for k in ks], [_f(k[3]) for k in ks], atr)
+        if maturity(legs) >= 3:
+            for p in list(out):
+                if p["type"] == "FLAG_BULL":
+                    out.append({**p, "type": "FINAL_FLAG_BULL", "label": "最终旗形（多）",
+                                "direction": "neutral",
+                                "note": "趋势末段旗形：突破后更容易失败"})
+                elif p["type"] == "FLAG_BEAR":
+                    out.append({**p, "type": "FINAL_FLAG_BEAR", "label": "最终旗形（空）",
+                                "direction": "neutral",
+                                "note": "趋势末段旗形：破位后更容易失败"})
+    except Exception:
+        pass
+
     return out
