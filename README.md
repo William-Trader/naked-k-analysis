@@ -6,47 +6,19 @@
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 [![Watermarked](https://img.shields.io/badge/code-watermarked%20(NKA)-orange.svg)](WATERMARK.md)
 
-> **零依赖、可回测、可闭环评分的 4h 价格行为（裸K）引擎。**
-> A zero-dependency, backtested, closed-loop price-action engine.
+> **零依赖、知识驱动、可闭环评分的 4h 价格行为（裸K）分析与监测引擎。**
+> A zero-dependency, knowledge-driven price-action analysis and monitoring engine.
 
 ## 为什么是它 / Why this one
 
-大多数“价格行为机器人”只是把指标拼在一起，然后让 LLM 编一段看多看空。这个项目的做法相反：
-
-1. **先有证据，再有规则。** 我们对机器人自己产出的 **201 条真实简报**（2026-09-13 ~ 10-20）对 Binance 真实 4h 价格做了回测。结果：24h 方向胜率只有 **40%**，唯一稳定的 edge 是 **4h 看空延续（66%）**。v2 的规则就是按这个结论写的，不是拍脑袋。见 [bench/RESULTS.md](bench/RESULTS.md)。
-2. **确定性信号，LLM 可选。** `nakedk signal` 只用标准库和公开行情算出方向/置信度/止损/目标；没有 API key 也能跑。LLM 只负责写简报文案，不负责编数字。
-3. **把亏损模式写进代码。** `pos20 < 0.30` 禁止看空、`pos20 > 0.70` 禁止看多、`ADX < 20` 不给趋势方向——直接掐掉回测里最亏钱的“区间边缘追单”。
-4. **闭环评分。** 每条信号都有 `SIGNAL|...` 机器可读行；`nakedk score` 用真实价格回算命中率、平均收益和置信度校准，下一轮优化继续用数据说话。
-5. **零依赖 + 测试 + CI + Docker。** 纯标准库，`unittest` 覆盖指标与风控规则，GitHub Actions 跑 3 个 Python 版本。
-
-## 实测基准 / Benchmark
-
-| 持有期 | 基准上涨率 | 看多命中 | 看空命中 | 方向合计 |
-|---|---|---|---|---|
-| +4h | 54.2% | 56% | **66%** | **61%** |
-| +8h | 54.2% | 48% | 43% | 45% |
-| +12h | 52.7% | 41% | 69% | 56% |
-| +24h | 55.2% | 37% | 43% | **40%** |
-| +48h | 49.8% | 44% | 43% | 44% |
-
-样本：201 条真实简报 / BTCUSDT 4h / 2026-09-13 ~ 2026-10-20。完整方法与原始数据见 [bench/](bench/)。
-
-### Walk-forward 现实检验 / Reality check
-
-对 v2 引擎本身做 365 天 walk-forward（BTC/ETH 4h，无参数拟合）：
-
-| 币 | 交易数 | 命中率 | 单笔均值 | 累计 | 最大回撤 |
-|---|---|---|---|---|---|
-| BTC | 446 | 49.3% | +0.006% | +1.13% | -15.72% |
-| ETH | 392 | 48.2% | +0.010% | +0.60% | -19.16% |
-
-**结论：没有找到稳健 alpha。** 9 个规则族 × 4 个周期 × 2 币 = 72 组，只有 1 组在训练/验证两段都为正（BTC 12h），符合随机噪声特征。所以本仓库不承诺收益，只承诺**可复现的证据与诚实的负结果**。详见 [bench/WALKFORWARD.md](bench/WALKFORWARD.md)。
-
-扩展到 **730 天 × 5 币** 后，5 个币全部为负（累计 -10.8% ~ -70.8%，未计手续费）——说明不是 BTC/ETH 的区间问题，而是这组规则本身没有 edge。我们不会靠调参把回测“调绿”，下一步换假设（横截面动量/状态过滤），并按同一套 walk-forward 验收。
+1. **知识驱动**：把 Al Brooks、YTC、崔海军、胡云生、许佳聪、陈浩《筹码分布》、Wyckoff 等资料蒸馏成可执行规则（`knowledge/` 7 个模块）。
+2. **确定性优先**：状态、防线、事件用规则算；LLM 只做叙述与综合，不负责编数字。
+3. **把风险模式写进代码**：`pos20 < 0.30` 禁止看空、`pos20 > 0.70` 禁止看多、`ADX < 20` 不给趋势方向。
+4. **闭环评分**：每条信号带 `SIGNAL|...` 行；`nakedk score` 用真实价格回算结果，供内部复盘。**不对外声明历史战绩。**
+5. **多频监测**：`beagle` 在 1m/5m 做事件检测，4h 做完整简报，1d 做复盘；去重/冷却/静默/限流。
+6. **工程化**：零依赖、22+ 单测、GitHub Actions、Dockerfile、Makefile、systemd 单元。
 
 ## 知识库 / Knowledge base
-
-`knowledge/` 是从 **Al Brooks、YTC、许佳聪、胡云生、崔海军、陈浩《筹码分布》、Wyckoff、Adam Grimes** 等资料蒸馏出的可执行规则：
 
 | 文件 | 内容 |
 |---|---|
@@ -54,17 +26,16 @@
 | `02-bar-reading.md` | 信号K/入场K、K线类型、买压卖压、订单流 |
 | `03-setups.md` | H1-H4/L1-L4、DB/DT、楔形、最终旗形、MTR、头肩、BLSHS |
 | `04-smart-money.md` | 吸筹/派发、筹码形态、Stop run/吸收/背离、主力 7 问 |
-| `05-decision-tree.md` | 9 步决策流程 + 置信度评分 + 禁止事项 |
-| `06-output-template.md` | 机器人输出模板 + 真实示例 |
-
-机器人按 **05 的 9 步流程**分析，按 **06 的模板**输出：市场状态 → 多空判断 → 结构证据 → 主力行为 → 关键位 → setup → 触发/失效/目标 → SIGNAL。
+| `05-decision-tree.md` | 9 步决策流程 + 置信度评分 + 硬规则 |
+| `06-output-template.md` | 机器人输出模板 + 示例 |
+| `07-ocr-distilled.md` | 扫描书 OCR 提纯：崔海军/胡云生/许佳聪 |
 
 ## 快速开始 / Quickstart
 
 ```bash
 # 不需要安装任何第三方包
-python3 -m nakedk fetch BTCUSDT ETHUSDT   # 打印 4h 结构指标 + K线
-python3 -m nakedk signal BTCUSDT ETHUSDT  # 输出确定性信号
+python3 -m nakedk fetch BTCUSDT ETHUSDT   # 4h 结构指标 + K线
+python3 -m nakedk signal BTCUSDT ETHUSDT  # 确定性信号 + SIGNAL 行
 python3 -m nakedk signal BTCUSDT --json   # 机器可读
 ```
 
@@ -81,43 +52,26 @@ bash scripts/pa_cron_setup.sh                               # 每 4 小时推送
 |---|---|
 | `nakedk fetch SYMBOL...` | 4h 结构摘要（EMA/ADX/RSI/ATR/量能/区间/摆动点） |
 | `nakedk signal SYMBOL...` | 确定性方向 + 置信度 + 止损/目标 + SIGNAL 行 |
-| `nakedk score LEDGER.jsonl` | 用真实价格回算命中率/收益/校准 |
-| `nakedk backtest SYMBOL... --days 365` | 对确定性引擎做 walk-forward 回测 |
-
-## 架构 / Architecture
-
-```
-Binance public API (data-api.binance.vision)
-        │
-        ▼
-nakedk.features   EMA/ADX/RSI/ATR/vol_z/swings/range-position
-        │
-        ▼
-nakedk.signals    deterministic stance + guards + levels
-        │
-        ├──► TEXT briefing (LLM optional) ──► QQ / chat
-        └──► SIGNAL|... ──► ledger.jsonl ──► nakedk.score
-```
-
-## 与同品类的位置 / Positioning
-
-| | naked-k-analysis | TradingAgents | freqtrade | CryptoSignal |
-|---|---|---|---|---|
-| 定位 | 价格行为分析与信号 | 多智能体投研框架 | 交易执行/回测 | TA 指标信号 |
-| 需要 LLM | 否（可选） | 是 | 否 | 否 |
-| 价格行为结构特征 | 原生 | 部分 | 否 | 指标为主 |
-| 真实产出回测 | **有（201 条）** | 无 | 策略回测 | 无 |
-| 信号闭环评分 | **有** | 部分 | 无 | 无 |
-| 第三方依赖 | **0** | 多 | 多 | 多 |
-
-> 目标不是比谁的星多，而是在“价格行为”这个细分里，把**证据、可复现、零依赖**做到最好。
-
+| `nakedk score LEDGER.jsonl` | 用真实价格回算信号结果（内部复盘） |
 
 ## 架构 v2 / Architecture
 
 - 设计推导与分层：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - 多频监测服务：`beagle/`（1m/5m 事件 → SQLite → 4h 简报）
 - 部署单元：`deploy/beagle-monitor.service`
+
+## 与同品类的位置 / Positioning
+
+| | naked-k-analysis | TradingAgents | freqtrade | CryptoSignal |
+|---|---|---|---|---|
+| 定位 | 价格行为分析与监测 | 多智能体投研框架 | 交易执行/回测 | TA 指标信号 |
+| 需要 LLM | 否（可选） | 是 | 否 | 否 |
+| 价格行为结构特征 | 原生 | 部分 | 否 | 指标为主 |
+| 知识库蒸馏 | **7 模块** | 部分 | 否 | 否 |
+| 信号闭环评分 | **有** | 部分 | 无 | 无 |
+| 第三方依赖 | **0** | 多 | 多 | 多 |
+
+> 目标不是比星数，而是在「价格行为」细分里，把知识、可复现、零依赖做到最好。
 
 ## 数据源 / Data
 
@@ -131,13 +85,14 @@ Binance 公共端点 `data-api.binance.vision`，无需 API Key。
 
 ## English
 
-**Zero-dependency price-action engine for 4h crypto markets.**
+**Zero-dependency, knowledge-driven price-action engine for 4h crypto markets.**
 
-- **Evidence first:** rules are derived from a backtest of 201 real briefings against Binance 4h prices. 24h directional calls scored **40%**; the only robust edge was **4h bearish continuation (66%)**.
-- **Deterministic signals:** `nakedk signal` computes direction, confidence, stop and target with the standard library only. No API key, no LLM required.
-- **Guards from losses:** no shorts when `pos20 < 0.30`, no longs when `pos20 > 0.70`, no trend call when `ADX < 20`.
-- **Closed loop:** every signal carries a `SIGNAL|...` line; `nakedk score` replays it against real prices for hit rate, average return and confidence calibration.
-- **Engineering:** stdlib only, `unittest`, GitHub Actions on Python 3.10/3.12/3.13, Dockerfile, Makefile.
+- **Knowledge-driven:** distilled rules from Al Brooks, YTC, Cui Haijun, Hu Yunsheng, Xu Jiacong, chip-distribution and Wyckoff material (`knowledge/`, 7 modules).
+- **Deterministic first:** state, guards and events are computed with rules; the LLM only narrates.
+- **Risk patterns in code:** no shorts when `pos20 < 0.30`, no longs when `pos20 > 0.70`, no trend call when `ADX < 20`.
+- **Closed loop:** every signal carries a `SIGNAL|...` line; `nakedk score` replays it against real prices for internal review. **No historical performance claims are made.**
+- **Multi-frequency monitoring:** `beagle` detects 1m/5m events, writes a 4h briefing and a daily review, with cooldowns, quiet hours and rate limits.
+- **Engineering:** stdlib only, 22+ unit tests, GitHub Actions, Dockerfile, Makefile, systemd unit.
 
 ```bash
 python3 -m nakedk fetch BTCUSDT ETHUSDT
@@ -145,6 +100,6 @@ python3 -m nakedk signal BTCUSDT ETHUSDT
 python3 -m nakedk score signals.jsonl
 ```
 
-**License:** [PolyForm Noncommercial License 1.0.0](LICENSE) — source-available, **noncommercial use only**. Core modules carry a traceable watermark (`WM: NKA-XXXXXXXX`, see [WATERMARK.md](WATERMARK.md)); removing it violates the license. Historical data only; **not investment advice.**
+**License:** [PolyForm Noncommercial License 1.0.0](LICENSE) — source-available, **noncommercial use only**. Core modules carry a traceable watermark (`WM: NKA-XXXXXXXX`, see [WATERMARK.md](WATERMARK.md)); removing it violates the license. **Not investment advice.**
 
 Required Notice: Copyright (c) 2026 William-Trader (https://github.com/William-Trader)
