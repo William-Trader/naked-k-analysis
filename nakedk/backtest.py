@@ -5,14 +5,7 @@
 # SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
 # Removing this mark violates the license.
 # -----------------------------------------------------------------
-"""Walk-forward backtest of the deterministic stance engine.
-
-The backtest is intentionally simple and honest: at every 4h bar it
-computes the same features the live bot uses, asks the same `stance`
-engine for a direction, and measures the realised signed return at a
-fixed horizon. No parameter fitting, no look-ahead. Costs (fees +
-slippage) are deducted per trade so the result is not flattered.
-"""
+"""Walk-forward backtest with intrabar path and realistic costs."""
 from __future__ import annotations
 
 import math
@@ -23,7 +16,7 @@ from .fetch import get_json
 from .signals import stance
 
 BAR_MS = {"1h": 3600_000, "4h": 4 * 3600_000}
-DEFAULT_COST_BPS = 10.0  # taker fee 4bp x2 + slippage ~1bp x2
+DEFAULT_COST_BPS = 12.0
 
 
 def fetch_history(symbol: str, interval: str = "4h", days: int = 365):
@@ -62,7 +55,28 @@ def _sharpe(returns: list):
     return None if sd == 0 else mu / sd
 
 
-def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float) -> list:
+def _path_slice(path_ks, start_ts: int, end_ts: int):
+    return [k for k in path_ks if start_ts < int(k[0]) <= end_ts]
+
+
+def _passes_gate(f, s, gate):
+    if not gate:
+        return True
+    if gate == "quality":
+        adx = f.get("adx14") or 0.0
+        slope = f.get("adx_slope") or 0.0
+        overlap = f.get("overlap") or 0.0
+        return adx >= 25 and slope >= 0 and overlap < 0.5
+    if gate == "quality_soft":
+        adx = f.get("adx14") or 0.0
+        slope = f.get("adx_slope") or 0.0
+        overlap = f.get("overlap") or 0.0
+        return adx >= 20 and slope >= -1.0 and overlap < 0.65
+    return True
+
+
+def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
+              gate=None) -> list:
     trades = []
     for i in range(lo, hi):
         window = ks[: i + 1][-200:]
@@ -71,18 +85,49 @@ def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float) -> list:
         except ValueError:
             continue
         s = stance(f)
-        if s["direction"] == "neutral":
+        if s["direction"] not in ("long", "short"):
+            continue
+        if not _passes_gate(f, s, gate):
             continue
         entry = float(ks[i][4])
         exit_ = float(ks[i + horizon][4])
-        raw = (exit_ / entry - 1.0) * 100.0
-        gross = raw if s["direction"] == "long" else -raw
+        stop, target = s.get("stop"), s.get("target")
+        gross = None
+        hit_stop = hit_target = False
+        if path_ks and stop and target:
+            bars = _path_slice(path_ks, int(ks[i][0]),
+                               int(ks[i + horizon][0]))
+            for k in bars:
+                high, low = float(k[2]), float(k[3])
+                if s["direction"] == "long":
+                    if low <= stop:
+                        hit_stop = True
+                        break
+                    if high >= target:
+                        hit_target = True
+                        break
+                else:
+                    if high >= stop:
+                        hit_stop = True
+                        break
+                    if low <= target:
+                        hit_target = True
+                        break
+        if hit_stop:
+            gross = (stop - entry) / entry * 100.0 if s["direction"] == "long" \
+                else (entry - stop) / entry * 100.0
+        elif hit_target:
+            gross = (target - entry) / entry * 100.0 if s["direction"] == "long" \
+                else (entry - target) / entry * 100.0
+        else:
+            raw = (exit_ / entry - 1.0) * 100.0
+            gross = raw if s["direction"] == "long" else -raw
         net = gross - cost_bps / 100.0
         trades.append({
             "ts": ks[i][0], "direction": s["direction"],
-            "confidence": s["confidence"], "raw_ret": raw,
-            "gross_ret": gross, "signed_ret": net,
-            "hit": net > 0,
+            "confidence": s["confidence"], "gross_ret": round(gross, 3),
+            "signed_ret": round(net, 3), "hit": net > 0,
+            "hit_stop": hit_stop, "hit_target": hit_target,
         })
     return trades
 
@@ -102,6 +147,7 @@ def _stats(trades: list) -> dict:
             "avg_ret": round(sum(t["signed_ret"] for t in sub) / len(sub), 3),
         }
 
+    sharpe = _sharpe([t["signed_ret"] for t in trades]) if trades else None
     return {
         "trades": len(trades),
         "hit_rate": (round(100.0 * sum(1 for t in trades if t["hit"]) / len(trades), 1)
@@ -110,24 +156,24 @@ def _stats(trades: list) -> dict:
                     if trades else None),
         "cum_return": round((equity[-1] - 1.0) * 100.0, 2) if equity else None,
         "max_drawdown": round(_max_drawdown(equity), 2) if equity else None,
-        "sharpe_per_trade": (round(_sharpe([t["signed_ret"] for t in trades]), 3)
-                             if trades else None),
+        "sharpe_per_trade": round(sharpe, 3) if sharpe is not None else None,
+        "stop_rate": (round(100.0 * sum(1 for t in trades if t["hit_stop"]) / len(trades), 1)
+                      if trades else None),
         "long": sub_stats([t for t in trades if t["direction"] == "long"]),
         "short": sub_stats([t for t in trades if t["direction"] == "short"]),
     }
 
 
 def run(symbol: str, days: int = 365, horizon: int = 1, warmup: int = 60,
-        cost_bps: float = DEFAULT_COST_BPS) -> dict:
+        cost_bps: float = DEFAULT_COST_BPS, intrabar: bool = True, gate=None) -> dict:
     ks = fetch_history(symbol, "4h", days)
+    path_ks = fetch_history(symbol, "1h", days) if intrabar else None
     lo = min(warmup, max(0, len(ks) // 4))
     hi = max(lo, len(ks) - horizon)
-    trades = _simulate(ks, lo, hi, horizon, cost_bps)
+    trades = _simulate(ks, lo, hi, horizon, cost_bps, path_ks, gate)
     out = {
-        "symbol": symbol,
-        "days": days,
-        "bars": len(ks),
-        "cost_bps": cost_bps,
+        "symbol": symbol, "days": days, "bars": len(ks),
+        "cost_bps": cost_bps, "intrabar": intrabar, "gate": gate,
         "trade_fraction": round(100.0 * len(trades) / max(1, hi - lo), 1),
     }
     out.update(_stats(trades))
@@ -135,13 +181,10 @@ def run(symbol: str, days: int = 365, horizon: int = 1, warmup: int = 60,
 
 
 def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
-                 warmup: int = 60, cost_bps: float = DEFAULT_COST_BPS) -> dict:
-    """Split the sample into consecutive out-of-sample folds.
-
-    Consistency across folds matters more than any single fold: a rule
-    that only works in one regime is noise, not edge.
-    """
+                 warmup: int = 60, cost_bps: float = DEFAULT_COST_BPS,
+                 intrabar: bool = True, gate=None) -> dict:
     ks = fetch_history(symbol, "4h", days)
+    path_ks = fetch_history(symbol, "1h", days) if intrabar else None
     lo = min(warmup, max(0, len(ks) // 4))
     hi = max(lo, len(ks) - horizon)
     span = hi - lo
@@ -150,23 +193,17 @@ def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
     for k in range(folds):
         a = lo + span * k // folds
         b = lo + span * (k + 1) // folds
-        trades = _simulate(ks, a, b, horizon, cost_bps)
+        trades = _simulate(ks, a, b, horizon, cost_bps, path_ks, gate)
         row = {"fold": k + 1, "bars": b - a}
         row.update(_stats(trades))
         results.append(row)
     positive = sum(1 for r in results if (r["avg_ret"] or 0) > 0)
     scored = [r["hit_rate"] for r in results if r["hit_rate"] is not None]
     return {
-        "symbol": symbol,
-        "days": days,
-        "folds": folds,
-        "horizon": horizon,
-        "cost_bps": cost_bps,
-        "bars": len(ks),
-        "fold_results": results,
-        "positive_folds": positive,
+        "symbol": symbol, "days": days, "folds": folds, "horizon": horizon,
+        "cost_bps": cost_bps, "intrabar": intrabar, "gate": gate, "bars": len(ks),
+        "fold_results": results, "positive_folds": positive,
         "fold_stability": round(positive / len(results) * 100.0, 1),
         "hit_rate_spread": (round(max(scored) - min(scored), 1) if len(scored) > 1 else None),
         "mean_hit_rate": round(sum(scored) / len(scored), 1) if scored else None,
     }
-

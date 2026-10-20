@@ -88,12 +88,14 @@ def cmd_backtest(args) -> int:
     folds = getattr(args, "folds", 1) or 1
     rows = []
     for symbol in args.symbols:
+        ib = not getattr(args, "no_intrabar", False)
         if folds > 1:
             rows.append(walk_forward(symbol, days=args.days, folds=folds,
-                                     horizon=args.horizon, cost_bps=args.cost_bps))
+                                     horizon=args.horizon, cost_bps=args.cost_bps,
+                                     intrabar=ib, gate=args.gate))
         else:
             rows.append(run(symbol, days=args.days, horizon=args.horizon,
-                            cost_bps=args.cost_bps))
+                            cost_bps=args.cost_bps, intrabar=ib, gate=args.gate))
     print(json.dumps(rows, ensure_ascii=False, indent=2))
     return 0
 
@@ -124,8 +126,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_bt.add_argument("--days", type=int, default=365)
     p_bt.add_argument("--horizon", type=int, default=1, help="exit horizon in 4h bars")
     p_bt.add_argument("--folds", type=int, default=1, help="split into N out-of-sample folds")
-    p_bt.add_argument("--cost-bps", type=float, default=10.0,
+    p_bt.add_argument("--cost-bps", type=float, default=12.0,
                       help="round-trip fees+slippage in basis points")
+    p_bt.add_argument("--no-intrabar", action="store_true",
+                      help="skip 1h path simulation (faster, less honest)")
+    p_bt.add_argument("--gate", choices=["none", "quality", "quality_soft"], default="none",
+                      help="extra entry gate for iteration")
     p_bt.set_defaults(func=cmd_backtest)
 
     return parser
