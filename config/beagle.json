@@ -18,6 +18,7 @@
   "rate_limit_per_hour": 6,
   "rate_limit_per_day": 20,
   "max_push_attempts": 5,
+  "max_alert_age_min": 30,
   "thresholds": {
     "price_shock_atr": 0.8,
     "price_shock_pct": 0.5,

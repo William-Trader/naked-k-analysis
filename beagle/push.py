@@ -51,6 +51,12 @@ def resolve_target(cfg: dict, db_path: str):
     return os.environ.get("BEAGLE_QQ_TARGET")
 
 
+def is_stale(created_at, now_ms: int, max_age_min: int) -> bool:
+    if not max_age_min or not created_at:
+        return False
+    return (now_ms - int(created_at)) > max_age_min * 60_000
+
+
 def _quiet(hour: int, cfg: dict) -> bool:
     q0, q1 = cfg.get("quiet_hours", [23, 8])
     return (hour >= q0 or hour < q1) if q0 > q1 else (q0 <= hour < q1)
@@ -60,7 +66,14 @@ def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20
     target = resolve_target(cfg, db_path)
     alerts = store.pending_alerts(db_path, limit)
     results = []
+    now_ms = int(time.time() * 1000)
+    max_age = int(cfg.get("max_alert_age_min", 30) or 0)
     for a in alerts:
+        if is_stale(a.get("created_at"), now_ms, max_age):
+            store.mark_stale(db_path, a["id"])
+            results.append({"id": a["id"], "status": "stale_skip",
+                            "age_min": round((now_ms - int(a["created_at"])) / 60_000, 1)})
+            continue
         if _quiet(time.localtime().tm_hour, cfg) and a["severity"] != "P0":
             results.append({"id": a["id"], "status": "quiet_skip"})
             continue
