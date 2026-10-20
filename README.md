@@ -31,6 +31,17 @@
 
 样本：201 条真实简报 / BTCUSDT 4h / 2026-09-13 ~ 2026-10-20。完整方法与原始数据见 [bench/](bench/)。
 
+### Walk-forward 现实检验 / Reality check
+
+对 v2 引擎本身做 365 天 walk-forward（BTC/ETH 4h，无参数拟合）：
+
+| 币 | 交易数 | 命中率 | 单笔均值 | 累计 | 最大回撤 |
+|---|---|---|---|---|---|
+| BTC | 446 | 49.3% | +0.006% | +1.13% | -15.72% |
+| ETH | 392 | 48.2% | +0.010% | +0.60% | -19.16% |
+
+**结论：没有找到稳健 alpha。** 9 个规则族 × 4 个周期 × 2 币 = 72 组，只有 1 组在训练/验证两段都为正（BTC 12h），符合随机噪声特征。所以本仓库不承诺收益，只承诺**可复现的证据与诚实的负结果**。详见 [bench/WALKFORWARD.md](bench/WALKFORWARD.md)。
+
 ## 快速开始 / Quickstart
 
 ```bash
@@ -54,6 +65,7 @@ bash scripts/pa_cron_setup.sh                               # 每 4 小时推送
 | `nakedk fetch SYMBOL...` | 4h 结构摘要（EMA/ADX/RSI/ATR/量能/区间/摆动点） |
 | `nakedk signal SYMBOL...` | 确定性方向 + 置信度 + 止损/目标 + SIGNAL 行 |
 | `nakedk score LEDGER.jsonl` | 用真实价格回算命中率/收益/校准 |
+| `nakedk backtest SYMBOL... --days 365` | 对确定性引擎做 walk-forward 回测 |
 
 ## 架构 / Architecture
 

@@ -51,6 +51,13 @@ def cmd_score(args) -> int:
     return 0
 
 
+def cmd_backtest(args) -> int:
+    from .backtest import run
+    rows = [run(symbol, days=args.days, horizon=args.horizon) for symbol in args.symbols]
+    print(json.dumps(rows, ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nakedk",
@@ -70,6 +77,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_score = sub.add_parser("score", help="score a JSONL signal ledger against real prices")
     p_score.add_argument("ledger")
     p_score.set_defaults(func=cmd_score)
+
+    p_bt = sub.add_parser("backtest", help="walk-forward backtest of the deterministic engine")
+    p_bt.add_argument("symbols", nargs="+")
+    p_bt.add_argument("--days", type=int, default=365)
+    p_bt.add_argument("--horizon", type=int, default=1, help="exit horizon in 4h bars")
+    p_bt.set_defaults(func=cmd_backtest)
 
     return parser
 
