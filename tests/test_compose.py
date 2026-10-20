@@ -35,8 +35,33 @@ class TestCompose(unittest.TestCase):
         ev = {"severity": "P1", "symbol": "BTCUSDT", "kind": "price_shock",
               "price": 81504, "payload": {"move_pct": 0.9, "atr_ratio": 1.2}}
         text = compose_event(ev)
-        self.assertIn("含义", text)
-        self.assertIn("建议", text)
+        self.assertIn("值得留意", text)
+        self.assertIn("现在怎么做", text)
+        self.assertIn("非投资建议", text)
+        self.assertLessEqual(len(text), 900)
+
+    def test_event_p2_observation(self):
+        ev = {"severity": "P2", "symbol": "BTCUSDT", "kind": "state_shift",
+              "price": 81504, "payload": {"prev_state": "range", "state": "up"}}
+        text = compose_event(ev)
+        self.assertIn("仅供观察", text)
+        self.assertIn("区间 → 上涨", text)
+        self.assertIn("等第一次回踩", text)
+
+    def test_range_break_plain(self):
+        ev = {"severity": "P1", "symbol": "BTCUSDT", "kind": "range_break",
+              "direction": "up", "price": 81350,
+              "payload": {"r20_lo": 80900, "r20_hi": 81300, "vol_z": 1.8}}
+        text = compose_event(ev)
+        self.assertIn("80,900.00 - 81,300.00", text)
+        self.assertIn("回踩", text)
+
+    def test_volume_spike_plain(self):
+        ev = {"severity": "P1", "symbol": "ETHUSDT", "kind": "volume_spike",
+              "price": 3000, "payload": {"vol_z": 3.4}}
+        text = compose_event(ev)
+        self.assertIn("成交量突然放大", text)
+        self.assertIn("别把放量当成方向", text)
 
     def test_validator_flags_table(self):
         self.assertFalse(validate_message("| a | b |\n结论 数据 非投资建议")["ok"])
