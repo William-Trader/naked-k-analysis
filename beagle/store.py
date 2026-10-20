@@ -244,6 +244,17 @@ def add_outcome(path: str, signal_id: int, horizon: int, ts: int, price,
         conn.close()
 
 
+def last_signal_ts(path: str, symbol: str):
+    conn = connect(path)
+    try:
+        row = conn.execute(
+            "SELECT MAX(ts) FROM signals WHERE symbol = ?", (symbol,)
+        ).fetchone()
+        return int(row[0]) if row and row[0] is not None else None
+    finally:
+        conn.close()
+
+
 def count_alerts_since(path: str, since_ms: int) -> int:
     conn = connect(path)
     try:

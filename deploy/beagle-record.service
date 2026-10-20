@@ -1,0 +1,9 @@
+[Unit]
+Description=Beagle signal recorder (once per 4h bar)
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/beagle-app
+Environment=PYTHONPATH=/home/ubuntu/nakedk-dashboard:/home/ubuntu/beagle-app
+ExecStart=/usr/bin/python3 -m beagle record --config /home/ubuntu/beagle-app/config/beagle.json

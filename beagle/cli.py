@@ -59,6 +59,57 @@ def cmd_score(args):
     return 0
 
 
+def cmd_record(args):
+    """Record the current closed-bar stance once per 4h bar (live loop input)."""
+    from nakedk.bars import closed_bars
+    from nakedk.features import features_from_klines
+    from nakedk.fetch import klines
+    from nakedk.mtf import alignment as mtf_alignment
+    from nakedk.patterns import arbitrate, detect as detect_patterns
+    from nakedk.signals import stance
+    from nakedk.structure import structure as structure_of
+
+    cfg = _cfg(args.config)
+    store.init(cfg["db_path"])
+    out = []
+    for symbol in (args.symbols or cfg["symbols"]):
+        try:
+            ks = closed_bars(klines(symbol, "4h", 200), "4h")
+            bar_ts = int(ks[-1][0])
+            last = store.last_signal_ts(cfg["db_path"], symbol)
+            if last is not None and last >= bar_ts:
+                out.append({"symbol": symbol, "status": "duplicate"})
+                continue
+            f = features_from_klines(ks)
+            s = stance(f)
+            if s["direction"] not in ("long", "short"):
+                out.append({"symbol": symbol, "status": "neutral"})
+                continue
+            arb = arbitrate(detect_patterns(ks, f), f)
+            stc = structure_of(ks)
+            try:
+                mtf = mtf_alignment(symbol)["alignment"]
+            except Exception:
+                mtf = None
+            setup = (arb.get("primary") or {}).get("type") or "NONE"
+            sid = store.add_signal(cfg["db_path"], {
+                "ts": bar_ts, "symbol": symbol,
+                "direction": s["direction"], "confidence": s.get("confidence"),
+                "entry": s.get("entry") or f["price"],
+                "stop": s.get("stop"), "target": s.get("target"),
+                "horizon_h": 4, "source": "live",
+                "setup": setup,
+                "regime": stc.get("state"), "mtf_alignment": mtf,
+            })
+            out.append({"symbol": symbol, "status": "recorded", "id": sid,
+                        "direction": s["direction"], "setup": setup,
+                        "mtf": mtf, "regime": stc.get("state")})
+        except Exception as e:
+            out.append({"symbol": symbol, "status": "error", "error": str(e)[:120]})
+    print(json.dumps(out, ensure_ascii=False))
+    return 0
+
+
 def cmd_review(args):
     from .review import build, render
     cfg = _cfg(args.config)
@@ -157,6 +208,11 @@ def build_parser():
     p_push.add_argument("--send", action="store_true")
     p_push.add_argument("--dry-run", action="store_true")
     p_push.set_defaults(func=cmd_push)
+    p_record = sub.add_parser("record")
+    p_record.add_argument("--config")
+    p_record.add_argument("--symbols", nargs="*")
+    p_record.set_defaults(func=cmd_record)
+
     p_review = sub.add_parser("review")
     p_review.add_argument("--config")
     p_review.add_argument("--apply", action="store_true")
