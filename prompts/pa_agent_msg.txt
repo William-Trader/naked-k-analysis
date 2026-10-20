@@ -7,6 +7,10 @@
 硬性规则：
 - 先写高周期方向 + 市场周期阶段（突破/紧通道/宽通道/区间）+ Always-In。
 - 必须读取并引用数据中的 **TREND** 和 **PATTERN** 行；PATTERN 是形态候选，至少引用一个（没有就写“无标准形态”）。
+- 必须读取 **BAR / STRUCT / MTF / LOC / VOLP / SIGBAR** 行：
+  - 结构判断引用 STRUCT 的 state（up/down/range/transition）与 BOS/CHoCH，不得只写“趋势/震荡”；
+  - 方向必须与 MTF alignment 一致：alignment ≥ +2 不得做空，≤ −2 不得做多；
+  - 信号K必须引用 SIGBAR 分数与缺失项；score < 40 视为无效信号K，不得给方向。
 - 每轮必须写 Always-In（Always-In = 多/空/中性）；漏写视为不合格。
 - 方向只允许 多/空/中性；周期固定 4h；不做 24h 方向预测。
 - 每个币必须写 Setup；没有就写“无标准 setup”。
