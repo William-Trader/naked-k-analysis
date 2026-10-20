@@ -1,0 +1,75 @@
+{
+  "version": "1.0",
+  "sources": [
+    "Al Brooks",
+    "YTC",
+    "许佳聪",
+    "胡云生",
+    "崔海军",
+    "陈浩筹码分布",
+    "Adam Grimes",
+    "Wyckoff"
+  ],
+  "states": [
+    "trend_up",
+    "trend_down",
+    "channel",
+    "range",
+    "transition"
+  ],
+  "hard_rules": [
+    "pos20 < 0.30 forbids short",
+    "pos20 > 0.70 forbids long",
+    "ADX < 20 forbids trend direction",
+    "no 24h directional forecast",
+    "no fabricated probability percentages",
+    "must provide trigger, invalidation, target"
+  ],
+  "scoring": {
+    "higher_timeframe_alignment": 20,
+    "location": 20,
+    "setup_quality": 20,
+    "trigger_confirmation": 15,
+    "order_flow": 15,
+    "risk_reward": 10
+  },
+  "verdicts": {
+    "high": ">=70",
+    "medium": "55-69",
+    "observe": "<55"
+  },
+  "setups": [
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "L1",
+    "L2",
+    "L3",
+    "L4",
+    "DB",
+    "DT",
+    "DB_PB",
+    "DT_BEAR_FLAG",
+    "wedge",
+    "final_flag",
+    "MTR",
+    "head_shoulders",
+    "rounded",
+    "BO_PB",
+    "EMA20_PB",
+    "BLSHS",
+    "range_breakout"
+  ],
+  "smart_money": [
+    "accumulation",
+    "markup",
+    "distribution",
+    "stop_run",
+    "absorption",
+    "failed_breakout",
+    "divergence",
+    "funding_crowding",
+    "oi_divergence"
+  ]
+}

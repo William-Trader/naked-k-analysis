@@ -44,6 +44,21 @@
 
 扩展到 **730 天 × 5 币** 后，5 个币全部为负（累计 -10.8% ~ -70.8%，未计手续费）——说明不是 BTC/ETH 的区间问题，而是这组规则本身没有 edge。我们不会靠调参把回测“调绿”，下一步换假设（横截面动量/状态过滤），并按同一套 walk-forward 验收。
 
+## 知识库 / Knowledge base
+
+`knowledge/` 是从 **Al Brooks、YTC、许佳聪、胡云生、崔海军、陈浩《筹码分布》、Wyckoff、Adam Grimes** 等资料蒸馏出的可执行规则：
+
+| 文件 | 内容 |
+|---|---|
+| `01-market-structure.md` | 四支柱、市场周期、趋势/区间/通道、状态机 |
+| `02-bar-reading.md` | 信号K/入场K、K线类型、买压卖压、订单流 |
+| `03-setups.md` | H1-H4/L1-L4、DB/DT、楔形、最终旗形、MTR、头肩、BLSHS |
+| `04-smart-money.md` | 吸筹/派发、筹码形态、Stop run/吸收/背离、主力 7 问 |
+| `05-decision-tree.md` | 9 步决策流程 + 置信度评分 + 禁止事项 |
+| `06-output-template.md` | 机器人输出模板 + 真实示例 |
+
+机器人按 **05 的 9 步流程**分析，按 **06 的模板**输出：市场状态 → 多空判断 → 结构证据 → 主力行为 → 关键位 → setup → 触发/失效/目标 → SIGNAL。
+
 ## 快速开始 / Quickstart
 
 ```bash
