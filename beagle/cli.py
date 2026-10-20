@@ -37,6 +37,11 @@ def cmd_status(args):
 def cmd_push(args):
     cfg = _cfg(args.config)
     store.init(cfg["db_path"])
+    if args.send or args.dry_run:
+        from .push import push_pending
+        print(json.dumps(push_pending(cfg, cfg["db_path"], dry_run=args.dry_run,
+                                      limit=args.limit), ensure_ascii=False, indent=2))
+        return 0
     alerts = store.pending_alerts(cfg["db_path"], args.limit)
     if args.mark_sent:
         for a in alerts:
@@ -85,6 +90,8 @@ def build_parser():
     p_push.add_argument("--config")
     p_push.add_argument("--limit", type=int, default=20)
     p_push.add_argument("--mark-sent", action="store_true")
+    p_push.add_argument("--send", action="store_true")
+    p_push.add_argument("--dry-run", action="store_true")
     p_push.set_defaults(func=cmd_push)
     return p
 

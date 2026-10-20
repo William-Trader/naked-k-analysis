@@ -1,0 +1,12 @@
+[Unit]
+Description=Beagle alert push bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/naked-k-analysis/beagle-app
+Environment=BEAGLE_CONFIG=/opt/naked-k-analysis/beagle-app/config/beagle.json
+EnvironmentFile=-/opt/naked-k-analysis/beagle-app/.beagle.env
+ExecStart=/usr/bin/python3 -m beagle push --send
