@@ -41,7 +41,28 @@ naked-k-analysis 是一个**零依赖的价格行为（裸K）分析与多频监
 - **反馈闭环**：信号落库 → 到期评分（收益、命中、MFE/MAE、盘中先触止损还是目标）→ 分桶复盘（Wilson 区间、样本门槛）→ 自适应权重。
 - **系统自迭代**：按形态实测边缘调整置信度权重，单次最多 ±0.08、区间 [0.70, 1.30]、连续两次劣化自动隔离，全部变更留审计日志。
 - **仪表盘**：暗色终端 UI，双币卡片含 MTF/结构/BAR/信号K 徽章、趋势评分、关键位、方向与三价位、K线图（EMA/支撑阻力/摆动点/成交量）、事件流；支持滚轮缩放、拖拽、画线、全屏。
-- **工程化**：零依赖、80 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署。
+- **逐笔与盘口**：最近 1000 笔成交 delta、大单数，top-100 盘口失衡与价差（`TRADES` / `BOOK`）。
+- **相关性门禁**：BTC/ETH 30 日相关 > 0.8 时视为同一风险，自动丢弃较弱一边（代码强制，不靠 prompt）。
+- **推送防刷**：30 分钟有效期 + 冷却/限流 + 失败重试与死信；旧事件不再补发。
+- **大白话推送**：P0/P1/P2 分别标注「需要立刻看 / 值得留意 / 仅供观察」，固定给「发生了什么 / 现在怎么做 / 关键位」。
+- **OpenClaw 技能对接**：`skills/price-action-analyst` + 幂等安装脚本，机器人按同一套数据与规则说话。
+- **工程化**：零依赖、110 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署。
+
+### QQ 推送消息
+
+推送不是把指标念一遍，而是三句话能照做：发生了什么、现在怎么做、哪里算错。
+
+```
+BTC · 值得留意
+1分钟急拉 0.90%，速度偏快（约 1.2 倍日常波动）
+现价 81,504.00
+发生了什么：可能是大单推动，也可能只是短线情绪，先别急着定性。
+现在怎么做：先别追。等 5 分钟收盘确认，站稳再跟；站不稳就是插针。
+关键位：站上 81,810 才算真突破；跌回 81,198 下方就是假突破。
+数据：Binance · 非投资建议
+```
+
+分级：`P0 需要立刻看` / `P1 值得留意` / `P2 仅供观察`。超过 30 分钟的旧告警会标记为 `stale`，不补发，避免刷屏。
 
 ### 六层分析链
 
@@ -245,7 +266,7 @@ It has three layers:
 - **4h briefing**: market cycle + always-in + structure numbers + smart-money evidence + key levels + setup + signal-bar quality + trigger/invalidation/target/R:R + counter-scenario + SIGNAL.
 - **Dashboard**: a dark terminal UI with BTC/ETH trend scores, key levels, stance and event feed; refreshes every 60 seconds.
 - **Closed loop**: each signal carries a `SIGNAL|...` line; `nakedk score` replays it against real prices.
-- **Engineering**: zero dependencies, 80 unit tests, GitHub Actions, Dockerfile, Makefile, systemd, one-click bootstrap.
+- **Engineering**: zero dependencies, 110 unit tests, GitHub Actions, Dockerfile, Makefile, systemd, one-click bootstrap.
 
 ### Quickstart (one-click)
 
@@ -347,7 +368,7 @@ Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 ### Engineering
 
 - Zero third-party dependencies (Python standard library + SQLite)
-- 80 unit tests; GitHub Actions (3.10/3.12/3.13)
+- 110 unit tests; GitHub Actions (3.10/3.12/3.13)
 - Dockerfile, Makefile, systemd units
 - `bootstrap.sh` one-click deployment; `AGENT-SETUP.md` step-by-step for agents
 
