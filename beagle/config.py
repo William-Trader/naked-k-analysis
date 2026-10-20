@@ -14,7 +14,9 @@ DEFAULTS = {
     "rate_limit_per_day": 20,
     "thresholds": {
         "price_shock_atr": 0.8,
+        "price_shock_pct": 0.5,
         "extreme_shock_atr": 2.0,
+        "extreme_pct": 1.5,
         "extreme_pct_1h": 3.0,
         "vol_z": 3.0,
         "breakout_vol_z": 1.0,

@@ -12,13 +12,13 @@ def feat(**over):
 
 class TestDetect(unittest.TestCase):
     def test_price_shock_p1(self):
-        ev = detect_events("BTCUSDT", feat(), 1090.0, 1000.0, 0.0)
+        ev = detect_events("BTCUSDT", feat(), 1005.0, 1000.0, 0.0)
         kinds = [e["kind"] for e in ev]
         self.assertIn("price_shock", kinds)
         self.assertEqual(next(e for e in ev if e["kind"] == "price_shock")["severity"], "P1")
 
     def test_extreme_shock_p0(self):
-        ev = detect_events("BTCUSDT", feat(), 1210.0, 1000.0, 0.0)
+        ev = detect_events("BTCUSDT", feat(), 1020.0, 1000.0, 0.0)
         self.assertIn("price_shock_extreme", [e["kind"] for e in ev])
 
     def test_volume_spike(self):
