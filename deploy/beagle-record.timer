@@ -1,0 +1,9 @@
+[Unit]
+Description=Record beagle stance 5 minutes after each 4h close
+
+[Timer]
+OnCalendar=*-*-* 00,04,08,12,16,20:05:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
