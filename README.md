@@ -43,7 +43,9 @@ It is organised in three layers:
 | `beagle/replay.py` | Historical event calibration |
 | `beagle/store.py` | SQLite schema and state |
 | `knowledge/` | Price-action playbooks and output template |
-| `deploy/` | systemd units for monitor and push timer |
+| `dashboard/server.py` | Zero-dependency dashboard API (`/api/overview`) |
+| `dashboard/index.html` | Dark terminal UI (trend score, levels, stance, events) |
+| `deploy/` | systemd units for monitor, push timer and dashboard |
 
 ## Quickstart
 
@@ -126,6 +128,16 @@ L6 Feedback  SIGNAL ledger -> outcome scoring -> calibration
 
 Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Dashboard
+
+`dashboard/` ships a zero-dependency dark terminal UI:
+
+```bash
+PYTHONPATH=. PORT=8080 python3 dashboard/server.py
+```
+
+It exposes `/api/overview` and renders BTC/ETH trend scores, key levels, stance and event feed. The page refreshes every 60 seconds.
+
 ## Deployment
 
 ```bash
@@ -134,6 +146,8 @@ sudo cp deploy/beagle-monitor.service /etc/systemd/system/
 sudo cp deploy/beagle-push.service deploy/beagle-push.timer /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now beagle-monitor beagle-push.timer
+sudo cp deploy/nakedk-dashboard.service /etc/systemd/system/
+sudo systemctl enable --now nakedk-dashboard
 ```
 
 ## Data

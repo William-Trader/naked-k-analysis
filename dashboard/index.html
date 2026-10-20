@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NAKED-K · 价格行为终端</title>
+<style>
+:root{--bg:#070b12;--panel:#0d1420;--panel2:#111a28;--line:#1c2a3d;--text:#e8eef8;--muted:#8b9bb4;--gold:#d9b45b;--up:#ff5b6e;--down:#35d07f;--amber:#f0b35b}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#122033 0,#070b12 60%);color:var(--text);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+header{max-width:1180px;margin:0 auto;padding:28px 22px 10px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.brand{font-size:22px;letter-spacing:.18em;font-weight:700}
+.brand span{color:var(--gold)}
+.sub{color:var(--muted);font-size:12px;margin-top:6px;letter-spacing:.08em}
+.live{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--down);box-shadow:0 0 12px var(--down)}
+main{max-width:1180px;margin:0 auto;padding:10px 22px 30px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.card{background:linear-gradient(180deg,#0f1826,#0b121d);border:1px solid var(--line);border-radius:16px;padding:18px 18px 14px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.sym{font-size:20px;font-weight:700;letter-spacing:.06em}
+.price{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:4px}
+.chg{font-size:13px;font-weight:600;margin-top:2px}
+.muted{color:var(--muted)}
+.gauge{margin-top:14px}
+.gauge-head{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+.bar{height:9px;border-radius:99px;background:#0a111c;border:1px solid var(--line);overflow:hidden;position:relative}
+.fill{height:100%;background:linear-gradient(90deg,var(--down),var(--gold),var(--up));border-radius:99px;transition:width .5s}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:14px}
+.stat{background:#0a111c;border:1px solid var(--line);border-radius:10px;padding:8px 6px;text-align:center}
+.stat b{display:block;font-size:13px;font-variant-numeric:tabular-nums}
+.stat i{display:block;font-style:normal;color:var(--muted);font-size:10px;margin-top:2px}
+.levels{margin-top:14px;font-size:12px;line-height:1.7}
+.levels b{color:var(--gold);font-weight:600}
+.sig{margin-top:12px;border-top:1px dashed var(--line);padding-top:10px;font-size:12px;line-height:1.7}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.06em}
+.spark{margin-top:10px}
+.spark svg{width:100%;height:54px;display:block}
+.events{max-width:1180px;margin:20px auto 0;padding:0 22px}
+.events h2{font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:600;margin:0 0 10px}
+.ev{display:flex;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#0a111c;font-size:12px}
+.ev .sev{font-weight:700;font-size:11px}
+.ev .t{color:var(--muted);font-variant-numeric:tabular-nums}
+footer{max-width:1180px;margin:0 auto;padding:18px 22px 40px;color:var(--muted);font-size:11px;line-height:1.7}
+@media(max-width:860px){.grid{grid-template-columns:1fr}header{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="brand">NAKED<span>-K</span> · 价格行为终端</div>
+    <div class="sub">PRICE ACTION TERMINAL · 4H STRUCTURE · ALWAYS-IN · SETUPS</div>
+  </div>
+  <div class="live"><span class="dot"></span><span id="asof">加载中…</span></div>
+</header>
+<main><div class="grid" id="grid"></div></main>
+<section class="events"><h2>EVENT FEED · 1M/5M</h2><div id="events"></div></section>
+<footer>分析工具，不构成投资建议。数据：Binance 公共端点。趋势评分 0–100 为描述性指标，不是收益预测。</footer>
+<script>
+var COLORS={up:'var(--up)',down:'var(--down)',neutral:'var(--muted)'};
+function fmt(n,d){ if(n===null||n===undefined) return '—'; return Number(n).toLocaleString('en-US',{minimumFractionDigits:d||2,maximumFractionDigits:d||2}); }
+function pct(n){ return (n>=0?'+':'')+Number(n).toFixed(2)+'%'; }
+function col(n){ return n>=0?COLORS.up:COLORS.down; }
+function spark(closes){
+  if(!closes||closes.length<2) return '';
+  var w=320,h=54,min=Math.min.apply(null,closes),max=Math.max.apply(null,closes);
+  var span=(max-min)||1;
+  var pts=closes.map(function(c,i){var x=(i/(closes.length-1))*w;var y=h-((c-min)/span)*h;return x.toFixed(1)+','+y.toFixed(1);}).join(' ');
+  return '<div class="spark"><svg viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none"><polyline points="'+pts+'" fill="none" stroke="var(--gold)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg></div>';
+}
+function card(sym,s){
+  var tr=s.trend||{},st=s.stance||{};
+  var dir=st.direction||'neutral';
+  var sc=tr.score||50;
+  var label=tr.label||'neutral';
+  var ai=tr.always_in||'neutral';
+  var levels='支撑 <b>'+fmt(s.r20_lo,1)+'</b> / '+fmt((s.swing_lows||[]).slice(-1)[0]||s.low24h,1)+' · 阻力 <b>'+fmt(s.r20_hi,1)+'</b> / '+fmt((s.swing_highs||[]).slice(-1)[0]||s.high24h,1);
+  var sig='方向 <span class="pill" style="color:'+COLORS[dir]+';border:1px solid '+COLORS[dir]+'">'+dir+'</span> · 置信度 <b>'+(st.confidence||'—')+'</b>';
+  if(st.entry) sig+=' · entry <b>'+fmt(st.entry,1)+'</b> · stop <b>'+fmt(st.stop,1)+'</b> · target <b>'+fmt(st.target,1)+'</b>';
+  return '<article class="card">'
+    +'<div class="card-top"><div><div class="sym">'+sym.replace('USDT','')+'<span class="muted" style="font-size:12px">/USDT</span></div>'
+    +'<div class="price">'+fmt(s.price,2)+'</div>'
+    +'<div class="chg" style="color:'+col(s.change24h)+'">'+pct(s.change24h)+' · 24h 高/低 '+fmt(s.high24h,1)+' / '+fmt(s.low24h,1)+'</div></div>'
+    +'<div style="text-align:right"><div class="muted" style="font-size:11px">TREND SCORE</div>'
+    +'<div style="font-size:26px;font-weight:700;color:'+(sc>=60?COLORS.up:sc<=40?COLORS.down:COLORS.neutral)+'">'+sc+'</div>'
+    +'<div class="muted" style="font-size:11px">'+label+'</div></div></div>'
+    +'<div class="gauge"><div class="gauge-head"><span>Always-In: <b style="color:'+COLORS[ai]+'">'+ai+'</b></span><span>0 — 100</span></div>'
+    +'<div class="bar"><div class="fill" style="width:'+sc+'%"></div></div></div>'
+    +'<div class="stats">'
+    +'<div class="stat"><b>'+fmt(s.adx,1)+'</b><i>ADX</i></div>'
+    +'<div class="stat"><b>'+fmt(s.rsi,1)+'</b><i>RSI</i></div>'
+    +'<div class="stat"><b>'+fmt(s.atr_pct,2)+'%</b><i>ATR</i></div>'
+    +'<div class="stat"><b>'+fmt(s.vol_z,2)+'</b><i>VOL Z</i></div>'
+    +'<div class="stat"><b>'+Math.round((s.pos20||0)*100)+'%</b><i>POS20</i></div>'
+    +'</div>'
+    +'<div class="levels">'+levels+'</div>'
+    +'<div class="sig">'+sig+'</div>'
+    +spark(s.closes)
+    +'</article>';
+}
+function render(d){
+  var g=document.getElementById('grid');
+  var keys=Object.keys(d.symbols||{});
+  g.innerHTML=keys.map(function(k){return card(k,d.symbols[k]);}).join('');
+  document.getElementById('asof').textContent='更新 '+new Date(d.as_of).toLocaleString('zh-CN',{hour12:false});
+  var ev=document.getElementById('events');
+  ev.innerHTML=(d.events||[]).map(function(e){
+    var t=new Date(e.ts).toLocaleString('zh-CN',{hour12:false});
+    var c=e.severity==='P0'?'var(--up)':e.severity==='P1'?'var(--amber)':'var(--muted)';
+    return '<div class="ev"><span class="sev" style="color:'+c+'">'+e.severity+'</span><span class="t">'+t+'</span><span>'+e.symbol+' · '+e.kind+'</span><span class="muted">'+fmt(e.price,1)+'</span></div>';
+  }).join('')||'<div class="ev muted">暂无事件</div>';
+}
+async function load(){
+  try{var r=await fetch('/api/overview');render(await r.json());}
+  catch(e){document.getElementById('asof').textContent='数据源异常';}
+}
+load();setInterval(load,60000);
+</script>
+</body>
+</html>
