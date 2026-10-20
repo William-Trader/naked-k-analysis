@@ -18,3 +18,13 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Syntax gate
         run: python -m compileall -q nakedk pa_fetch.py
+
+      - name: Dashboard JS syntax
+        run: |
+          python - <<'PY'
+          import re
+          s = open('dashboard/index.html', encoding='utf-8').read()
+          m = re.search(r'<script>(.*?)</script>', s, re.S)
+          open('/tmp/dash.js', 'w', encoding='utf-8').write(m.group(1) if m else '')
+          PY
+          node --check /tmp/dash.js

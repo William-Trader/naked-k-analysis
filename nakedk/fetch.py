@@ -14,7 +14,7 @@ from urllib.request import Request, urlopen
 
 from .features import features_from_klines
 from .trend import trend_score
-from .patterns import detect as detect_patterns
+from .patterns import arbitrate, detect as detect_patterns
 
 BASE = "https://data-api.binance.vision"
 CST = timezone(timedelta(hours=8))
@@ -91,10 +91,13 @@ def summarise(symbol: str) -> tuple[str, dict]:
     ts = trend_score(f)
     lines.append(f"TREND|{base}|score={ts['score']}|label={ts['label']}|always_in={ts['always_in']}|ema={ts['components']['ema']}|adx={ts['components']['adx']}|pos={ts['components']['pos']}|mom={ts['components']['mom']}")
     lines.append(f"trend: {ts['score']}/100 ({ts['label']}, Always-In={ts['always_in']})")
-    pats = detect_patterns(k4, f)
-    for pp in pats:
-        lines.append(f"PATTERN|{base}|{pp['type']}|{pp['direction']}|{pp['label']}|price={pp['price']:.2f}|conf={pp['conf']:.2f}|{pp.get('note','')}")
-    if not pats:
+    arb = arbitrate(detect_patterns(k4, f), f)
+    prim = arb["primary"] or {}
+    sec = arb["secondary"] or {}
+    lines.append(f"PATTERN_CTX|{base}|context={arb['context']}|primary={prim.get('type','NONE')}|secondary={sec.get('type','NONE')}")
+    for pp in arb["patterns"]:
+        lines.append(f"PATTERN|{base}|{pp['type']}|{pp['direction']}|{pp['label']}|price={pp['price']:.2f}|quality={pp['quality']}|score={pp['score']}|role={pp['role']}|rr={pp.get('rr','')}|{pp.get('note','')}")
+    if not arb["patterns"]:
         lines.append(f"PATTERN|{base}|NONE|neutral|无标准形态|")
     lines.append("")
     lines.append("--- 4h candles (last 42, newest last) ---")
