@@ -116,6 +116,17 @@ PYTHONPATH=. PORT=8080 python3 dashboard/server.py
 
 访问 `http://<host>:8080/`：暗色终端 UI，BTC/ETH 双卡，趋势评分、Always-In、ADX/RSI/ATR/vol_z/pos20、关键位、方向/entry/stop/target、4h 走势线、1m/5m 事件流；每 60 秒刷新。
 
+### 扩展数据源
+
+本工具的数据层与市场无关。价格行为交易者可以让 Agent 自行修改 `nakedk/fetch.py` 与 `beagle/config.py`，接入其他数据源（其他交易所、股票/期货/外汇 API），分析更多市场。
+
+可行范围取决于两点：
+
+- **服务器性能**：1m 轮询的品种数、K线回补与回放会消耗 CPU/内存；
+- **数据源强度**：速率限制、历史深度、字段完整性与稳定性。
+
+建议先加一个市场、跑通 `nakedk fetch`，再逐步扩展 watchlist；不要把全市场一次性塞进 1m 轮询。
+
 ### 知识库
 
 | 文件 | 内容 |
@@ -241,6 +252,17 @@ PYTHONPATH=. PORT=8080 python3 dashboard/server.py
 ```
 
 Open `http://<host>:8080/`: dark terminal UI with BTC/ETH cards, trend score, always-in, ADX/RSI/ATR/vol_z/pos20, key levels, stance/entry/stop/target, 4h sparkline and 1m/5m event feed. Refreshes every 60 seconds.
+
+### Extending data sources
+
+The data layer is market-agnostic. Price-action traders can ask an agent to modify `nakedk/fetch.py` and `beagle/config.py` to plug in other data sources (other exchanges, equities, futures, FX APIs) and analyse more markets.
+
+Feasibility depends on:
+
+- **Server capacity**: 1m polling across many symbols, backfills and replays consume CPU and RAM;
+- **Data-source strength**: rate limits, history depth, field completeness and stability.
+
+Start with one market and verify `nakedk fetch`, then grow the watchlist gradually; do not put the whole market into 1m polling at once.
 
 ### Knowledge base
 
