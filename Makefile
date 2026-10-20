@@ -1,4 +1,7 @@
-.PHONY: test demo signal score clean
+.PHONY: test demo signal score bootstrap dashboard clean
+
+bootstrap:
+	bash bootstrap.sh
 
 test:
 	python3 -m unittest discover -s tests -v
@@ -15,3 +18,6 @@ score:
 
 clean:
 	rm -rf __pycache__ nakedk/__pycache__ tests/__pycache__
+
+dashboard:
+	PYTHONPATH=. PORT=8080 python3 dashboard/server.py

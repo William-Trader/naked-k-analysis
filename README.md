@@ -4,103 +4,245 @@
 
 [![ci](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#zero-dependencies)
+[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#engineering)
 [![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](LICENSE)
 [![Watermarked](https://img.shields.io/badge/code-watermarked%20(NKA)-orange.svg)](WATERMARK.md)
 
-## Overview
+> **许可 / License**: [PolyForm Noncommercial License 1.0.0](LICENSE).
+> **仅供价格行为交易者研究使用；禁止任何商业用途；违法必究。**
+> **For price-action traders and researchers only. Commercial use is prohibited. Violators will be prosecuted.**
 
-naked-k-analysis is a self-contained toolkit for reading price action (naked K), producing deterministic signals, monitoring market events, and delivering structured briefings.
+---
 
-It is organised in three layers:
+## 中文
 
-- **`nakedk`** — deterministic analysis engine: features, stance, levels, signal ledger, scoring, walk-forward replay.
-- **`beagle`** — multi-frequency monitor: 1m/5m event detection, SQLite state, cooldowns, rate limits, push bridge.
-- **`knowledge`** — distilled price-action playbooks (Al Brooks, YTC, Wyckoff, chip distribution, and Chinese naked-K authors).
+### 概览
 
-## Features
+naked-k-analysis 是一个**零依赖的价格行为（裸K）分析与多频监测工具包**。它不做交易执行，也不承诺预测；它把 Al Brooks 体系蒸馏成可执行规则，输出可审阅的结构化分析。
 
-- **Deterministic first.** State, guards and events are computed with rules; an LLM is optional and only narrates.
-- **Price-action native.** Market cycle, always-in, signal bars, H1-H4/L1-L4, DB/DT, wedges, final flags, MTR, BLSHS.
-- **Multi-frequency.** 1m/5m detection, 4h briefings, daily review.
-- **Closed loop.** Every signal carries a machine-readable `SIGNAL|...` line; `nakedk score` replays it against real prices for internal review.
-- **Zero dependencies.** Python standard library only; SQLite for state.
-- **Production-ready.** 33 unit tests, GitHub Actions (3.10/3.12/3.13), Dockerfile, Makefile, systemd units.
+系统由三层组成：
 
-## Components
+- **`nakedk`**：确定性分析引擎（特征、趋势评分、状态、信号、评分、历史回放）。
+- **`beagle`**：多频监测服务（1m/5m 事件、SQLite 状态、去重/冷却/限流、推送桥）。
+- **`knowledge`**：9 个价格行为知识模块（市场结构、逐K、Setup、主力、决策树、输出模板、OCR 提纯、Al Brooks 深度框架、评审标准）。
 
-| Path | Purpose |
+### 功能
+
+- **确定性分析**：EMA/ADX/RSI/ATR/量能 z/区间位置/摆动点全部用规则计算；LLM 只负责叙述。
+- **趋势评分 0–100**：EMA 排列 + ADX 强度 + 区间位置 + 24h 动量；输出 `TREND|...`，供机器人/前端统一使用。
+- **多频监测**：1m/5m 价格冲击、量能异常、区间突破、状态切换、资金费率极端。
+- **自动提醒**：P0/P1/P2 分级；P0 群+私聊，P1 群，P2 只进 4h 简报；冷却/静默/限流。
+- **默认 QQ 机器人**：通过 OpenClaw qqbot 通道推送；聊天「分析X」走价格行为框架。
+- **4h 完整简报**：市场周期 + Always-In + 结构数字 + 主力行为 + 关键位 + Setup + 信号K四项 + 触发/失效/目标/R:R + 反方情景 + SIGNAL。
+- **精美仪表盘**：暗色终端 UI，BTC/ETH 趋势评分、关键位、方向、事件流；60 秒刷新。
+- **闭环评分**：每条信号带 `SIGNAL|...`，`nakedk score` 用真实价格回算，供内部复盘。
+- **工程化**：零依赖、33 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署脚本。
+
+### 系统组成
+
+| 路径 | 作用 |
 |---|---|
-| `nakedk/features.py` | EMA, ADX, RSI, ATR, volume z-score, swing points, range position |
-| `nakedk/signals.py` | Deterministic stance engine with guards and levels |
-| `nakedk/fetch.py` | Binance public-data fetcher and text summariser |
-| `nakedk/score.py` | Signal-ledger outcome scoring |
-| `nakedk/backtest.py` | Walk-forward replay of the deterministic engine |
-| `nakedk/cli.py` | `fetch`, `signal`, `score`, `backtest` |
-| `beagle/detect.py` | Price-shock, volume-spike, range-break, state-shift, funding detectors |
-| `beagle/monitor.py` | Snapshot -> features -> events -> SQLite |
-| `beagle/push.py` | Pending-alert push bridge |
-| `beagle/replay.py` | Historical event calibration |
-| `beagle/store.py` | SQLite schema and state |
-| `knowledge/` | Price-action playbooks and output template |
-| `dashboard/server.py` | Zero-dependency dashboard API (`/api/overview`) |
-| `dashboard/index.html` | Dark terminal UI (trend score, levels, stance, events) |
-| `deploy/` | systemd units for monitor, push timer and dashboard |
+| `nakedk/features.py` | EMA、ADX、RSI、ATR、量能 z、摆动点、区间位置 |
+| `nakedk/trend.py` | 0–100 趋势评分 + Always-In |
+| `nakedk/signals.py` | 确定性方向 + 防线 + 止损/目标 |
+| `nakedk/fetch.py` | Binance 公共数据 + 文本摘要 + TREND 行 |
+| `nakedk/score.py` | 信号结果回算 |
+| `nakedk/backtest.py` | 历史回放（内部研究） |
+| `beagle/detect.py` | 6 类事件检测 |
+| `beagle/monitor.py` | 快照 → 特征 → 事件 → SQLite |
+| `beagle/push.py` | 待推送告警 → QQ |
+| `beagle/replay.py` | 历史事件校准 |
+| `dashboard/` | 零依赖仪表盘 API + 暗色前端 |
+| `knowledge/` | 9 个价格行为模块 |
+| `deploy/` | systemd 单元：monitor / push / dashboard |
+| `bootstrap.sh` | 一键部署 |
+| `AGENT-SETUP.md` | 给 Agent 的一键设置说明 |
 
-## Quickstart
+### 快速开始（一键部署）
 
 ```bash
 git clone https://github.com/William-Trader/naked-k-analysis.git
 cd naked-k-analysis
+bash bootstrap.sh
+```
+
+手动运行：
+
+```bash
 python3 -m unittest discover -s tests
 python3 -m nakedk fetch BTCUSDT ETHUSDT
 python3 -m nakedk signal BTCUSDT ETHUSDT
+PYTHONPATH=. PORT=8080 python3 dashboard/server.py
 ```
 
-Docker:
+### QQ 机器人（默认集成）
+
+默认推送通道是 **OpenClaw qqbot**。配置：
+
+1. 复制 `config/openclaw.example.json` 到 `~/.openclaw/openclaw.json`，填入 `channels.qqbot.appId`、`channels.qqbot.clientSecret`、`gateway.auth.token`。
+2. 在 `.beagle.env` 填 `BEAGLE_QQ_TARGET=group:<群 openid>`（600 权限，不进仓库）。
+3. 4h 简报：`bash scripts/pa_cron_setup.sh`（先替换群 openid 占位符）。
+4. 5 分钟事件推送：`beagle-push.timer`。
+5. 聊天「分析BTC」：走 `pa_fetch` + `08/09` → `06` 模板，不再使用旧的 13 智能体流程。
+
+### 自动分析与提醒
+
+| 频率 | 任务 | 输出 |
+|---|---|---|
+| 1m | 价格冲击 / 量能异常 | P1/P2 事件 |
+| 5m | 区间/关键位突破 | P1 事件 |
+| 15m | 状态切换 / 主力迹象 | P2 事件 |
+| 4h | 完整简报 | QQ 群 |
+| 事件 | P0 极端行情 | 群 + 私聊 |
+
+提醒策略：P0 立即；P1 5 分钟聚合；P2 只进 4h 简报；23:00–08:00 只推 P0；冷却 60/120/360 分钟；全局限流 6 条/小时、20 条/天。
+
+### 趋势评分
+
+`nakedk/trend.py` 输出 0–100 分：
+
+- EMA20/EMA50 排列 + 价格位置（±20）
+- ADX 强度（±20）
+- 区间位置 pos20（±10）
+- 24h 动量（±10）
+
+评分是**描述性指标**，不是收益预测；≥60 视为多头结构，≤40 视为空头结构，中间为中性。
+
+### 仪表盘
 
 ```bash
-docker build -t nakedk .
-docker run --rm nakedk fetch BTCUSDT ETHUSDT
+PYTHONPATH=. PORT=8080 python3 dashboard/server.py
 ```
 
-## CLI
+访问 `http://<host>:8080/`：暗色终端 UI，BTC/ETH 双卡，趋势评分、Always-In、ADX/RSI/ATR/vol_z/pos20、关键位、方向/entry/stop/target、4h 走势线、1m/5m 事件流；每 60 秒刷新。
 
-| Command | Purpose |
+### 知识库
+
+| 文件 | 内容 |
 |---|---|
-| `python3 -m nakedk fetch SYMBOL...` | 4h structure: EMA/ADX/RSI/ATR/volume/range/swings |
-| `python3 -m nakedk signal SYMBOL...` | Deterministic direction, confidence, stop, target, SIGNAL line |
-| `python3 -m nakedk score LEDGER.jsonl` | Replay signals against real prices |
-| `python3 -m nakedk backtest SYMBOL... --days 365` | Walk-forward replay of the engine |
-| `python3 -m beagle once` | One monitoring scan |
-| `python3 -m beagle monitor` | Continuous 60s monitor |
-| `python3 -m beagle replay --days 1` | Historical event calibration |
-| `python3 -m beagle push --dry-run` | Preview pending alerts |
-| `python3 -m beagle status` | Heartbeat, queue depth, last event |
+| `01-market-structure.md` | 市场周期、趋势/区间/通道、状态机 |
+| `02-bar-reading.md` | 信号K/入场K、K线类型、买压卖压、订单流 |
+| `03-setups.md` | H1-H4/L1-L4、DB/DT、楔形、最终旗形、MTR、头肩、BLSHS |
+| `04-smart-money.md` | 吸筹/派发、筹码形态、Stop run/吸收/背离 |
+| `05-decision-tree.md` | 9 步决策流程 + 硬规则 |
+| `06-output-template.md` | 输出模板 + 示例 |
+| `07-ocr-distilled.md` | 扫描书 OCR 提纯 |
+| `08-albrooks-deep.md` | Al Brooks 深度框架 + 12 问 |
+| `09-review-rubric.md` | 输出评审标准（60 + 20 分） |
 
-## Monitoring
+### 架构
 
-`beagle` polls a watchlist and writes normalised events to SQLite:
+```
+L0 数据      Binance 1m/5m/15m/1h/4h/1d + 资金费率/FGI
+L1 特征      EMA/ADX/RSI/ATR/量能 z/区间/摆动点
+L2 事件      价格冲击/量能异常/区间突破/状态切换/资金费率
+L3 分析      确定性 stance + 趋势评分 + 可选 LLM 叙述
+L4 决策      P0/P1/P2 + entry/stop/target + 置信度
+L5 投递      OpenClaw qqbot / 任意 webhook；去重/冷却/静默/限流
+L6 反馈      SIGNAL → 结果评分 → 校准
+```
 
-| Event | Severity | Trigger |
+完整设计：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
+### 工程化
+
+- 零第三方依赖（Python 标准库 + SQLite）
+- 33 个单测；GitHub Actions（3.10/3.12/3.13）
+- Dockerfile、Makefile、systemd 单元
+- `bootstrap.sh` 一键部署；`AGENT-SETUP.md` 给 Agent 的逐步说明
+
+### 许可与免责
+
+- **PolyForm Noncommercial License 1.0.0**：source-available，**禁止商用**。
+- **仅供价格行为交易者研究使用**；不得转售、再许可、嵌入付费产品。
+- **违法必究**：未经授权的商业使用将依法追究。
+- 本工具不执行交易，不构成投资建议；不声明任何历史业绩。
+
+---
+
+## English
+
+### Overview
+
+naked-k-analysis is a **zero-dependency price-action analysis and multi-frequency monitoring toolkit**. It does not execute trades and makes no prediction claims. It distils the Al Brooks framework into executable rules and produces structured, reviewable analysis.
+
+It has three layers:
+
+- **`nakedk`** — deterministic analysis engine (features, trend score, stance, signals, scoring, replay).
+- **`beagle`** — multi-frequency monitor (1m/5m events, SQLite state, cooldowns, push bridge).
+- **`knowledge`** — nine price-action modules (market structure, bar reading, setups, smart money, decision tree, output template, OCR distillation, deep Al Brooks framework, review rubric).
+
+### Features
+
+- **Deterministic first**: EMA/ADX/RSI/ATR/volume z/range position/swings are computed with rules; the LLM only narrates.
+- **Trend score 0–100**: EMA alignment + ADX strength + range position + 24h momentum; emitted as `TREND|...`.
+- **Multi-frequency monitoring**: 1m/5m price shocks, volume spikes, range breaks, state shifts, funding extremes.
+- **Automatic alerts**: P0/P1/P2; P0 group + direct, P1 group, P2 only in the 4h briefing; cooldowns, quiet hours, rate limits.
+- **Default QQ bot**: delivered through the OpenClaw qqbot channel; chat `分析X` uses the price-action framework.
+- **4h briefing**: market cycle + always-in + structure numbers + smart-money evidence + key levels + setup + signal-bar quality + trigger/invalidation/target/R:R + counter-scenario + SIGNAL.
+- **Dashboard**: a dark terminal UI with BTC/ETH trend scores, key levels, stance and event feed; refreshes every 60 seconds.
+- **Closed loop**: each signal carries a `SIGNAL|...` line; `nakedk score` replays it against real prices.
+- **Engineering**: zero dependencies, 33 unit tests, GitHub Actions, Dockerfile, Makefile, systemd, one-click bootstrap.
+
+### Quickstart (one-click)
+
+```bash
+git clone https://github.com/William-Trader/naked-k-analysis.git
+cd naked-k-analysis
+bash bootstrap.sh
+```
+
+Manual:
+
+```bash
+python3 -m unittest discover -s tests
+python3 -m nakedk fetch BTCUSDT ETHUSDT
+python3 -m nakedk signal BTCUSDT ETHUSDT
+PYTHONPATH=. PORT=8080 python3 dashboard/server.py
+```
+
+### QQ bot integration (default)
+
+The default delivery channel is **OpenClaw qqbot**:
+
+1. Copy `config/openclaw.example.json` to `~/.openclaw/openclaw.json` and fill `channels.qqbot.appId`, `channels.qqbot.clientSecret`, `gateway.auth.token`.
+2. Set `BEAGLE_QQ_TARGET=group:<group_openid>` in `.beagle.env` (mode 600, never committed).
+3. 4h briefing: `bash scripts/pa_cron_setup.sh` (replace the group openid placeholder first).
+4. 5-minute event push: `beagle-push.timer`.
+5. Chat `分析BTC`: `pa_fetch` + `08/09` → `06` template; the legacy 13-agent pipeline is retired.
+
+### Automatic analysis and alerts
+
+| Frequency | Task | Output |
 |---|---|---|
-| `price_shock` | P1 | abs(1m move) >= 0.5% or 0.8x ATR |
-| `price_shock_extreme` | P0 | abs(1m move) >= 1.5% or 2.0x ATR |
-| `volume_spike` | P1 | volume z-score >= 4 with a price move |
-| `range_break` | P1 | close beyond the 20-bar range with volume |
-| `state_shift` | P2 | trend state changes |
-| `funding_extreme` | P2 | abs(funding) >= 0.1% per 8h |
+| 1m | Price shock / volume spike | P1/P2 events |
+| 5m | Range / key-level break | P1 event |
+| 15m | State shift / smart-money clue | P2 event |
+| 4h | Full briefing | QQ group |
+| Event | P0 extreme move | Group + direct |
 
-Delivery policy:
+Policy: P0 immediate; P1 aggregated in 5 minutes; P2 only in the 4h briefing; quiet hours 23:00–08:00 (P0 only); cooldowns 60/120/360 minutes; rate limits 6 per hour and 20 per day.
 
-- P0 -> group + direct; P1 -> group; P2 -> only in the 4h briefing.
-- Cooldowns: P0 60 min, P1 120 min, P2 360 min.
-- Quiet hours: 23:00-08:00, P0 only.
-- Rate limits: 6 per hour, 20 per day.
+### Trend score
 
-Configuration: `config/beagle.json`. The push target is read from `BEAGLE_QQ_TARGET` (environment file), never committed.
+`nakedk/trend.py` returns 0–100:
 
-## Knowledge base
+- EMA20/EMA50 alignment and price location (±20)
+- ADX strength (±20)
+- range position pos20 (±10)
+- 24h momentum (±10)
+
+It is **descriptive, not predictive**: ≥60 is a bullish structure, ≤40 bearish, otherwise neutral.
+
+### Dashboard
+
+```bash
+PYTHONPATH=. PORT=8080 python3 dashboard/server.py
+```
+
+Open `http://<host>:8080/`: dark terminal UI with BTC/ETH cards, trend score, always-in, ADX/RSI/ATR/vol_z/pos20, key levels, stance/entry/stop/target, 4h sparkline and 1m/5m event feed. Refreshes every 60 seconds.
+
+### Knowledge base
 
 | File | Content |
 |---|---|
@@ -108,92 +250,38 @@ Configuration: `config/beagle.json`. The push target is read from `BEAGLE_QQ_TAR
 | `02-bar-reading.md` | Signal/entry bars, bar types, buying/selling pressure, order flow |
 | `03-setups.md` | H1-H4/L1-L4, DB/DT, wedges, final flags, MTR, head-and-shoulders, BLSHS |
 | `04-smart-money.md` | Accumulation/distribution, chip patterns, stop runs, absorption, divergence |
-| `05-decision-tree.md` | 9-step decision flow, confidence scoring, hard guards |
+| `05-decision-tree.md` | 9-step decision flow and hard guards |
 | `06-output-template.md` | Briefing template and example |
-| `07-ocr-distilled.md` | OCR-distilled rules from scanned Chinese naked-K books |
-| `08-albrooks-deep.md` | Deep Al Brooks framework: cycle, always-in, setups, probability, management, 12 questions |
-| `09-review-rubric.md` | 12-criterion output review rubric (0-60) |
+| `07-ocr-distilled.md` | OCR-distilled rules from scanned naked-K books |
+| `08-albrooks-deep.md` | Deep Al Brooks framework and 12 questions |
+| `09-review-rubric.md` | Output review rubric (60 + 20 points) |
 
-## Architecture
+### Architecture
 
 ```
-L0 Data      Binance public 1m/5m/15m/1h/4h/1d + optional funding/FGI
-L1 Features  EMA20/50, ADX14, RSI14, ATR%, volume z, range 20/40, swings
-L2 Events    price shock, volume spike, range break, state shift, funding
-L3 Analysis  deterministic stance + optional LLM narration (knowledge/05, 08)
-L4 Decision  severity, entry/stop/target, confidence
-L5 Delivery  OpenClaw/qqbot or any webhook; cooldowns, quiet hours, rate limits
-L6 Feedback  SIGNAL ledger -> outcome scoring -> calibration
+L0 Data      Binance 1m/5m/15m/1h/4h/1d + funding/FGI
+L1 Features  EMA/ADX/RSI/ATR/volume z/range/swings
+L2 Events    price shock/volume spike/range break/state shift/funding
+L3 Analysis  deterministic stance + trend score + optional LLM narration
+L4 Decision  P0/P1/P2 + entry/stop/target + confidence
+L5 Delivery  OpenClaw qqbot or any webhook; cooldowns/quiet hours/rate limits
+L6 Feedback  SIGNAL → outcome scoring → calibration
 ```
 
 Full design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-## Dashboard
+### Engineering
 
-`dashboard/` ships a zero-dependency dark terminal UI:
+- Zero third-party dependencies (Python standard library + SQLite)
+- 33 unit tests; GitHub Actions (3.10/3.12/3.13)
+- Dockerfile, Makefile, systemd units
+- `bootstrap.sh` one-click deployment; `AGENT-SETUP.md` step-by-step for agents
 
-```bash
-PYTHONPATH=. PORT=8080 python3 dashboard/server.py
-```
+### License and disclaimer
 
-It exposes `/api/overview` and renders BTC/ETH trend scores, key levels, stance and event feed. The page refreshes every 60 seconds.
+- **PolyForm Noncommercial License 1.0.0**: source-available, **commercial use prohibited**.
+- **Research use by price-action traders only**; no resale, sublicensing or inclusion in paid products.
+- **Violators will be prosecuted.** Unauthorized commercial use will be pursued to the fullest extent permitted by law.
+- This tool does not execute trades and is **not investment advice**; no historical performance claims are made.
 
-## Deployment
-
-```bash
-rsync -az --exclude .git ./ user@host:/opt/naked-k-analysis/
-sudo cp deploy/beagle-monitor.service /etc/systemd/system/
-sudo cp deploy/beagle-push.service deploy/beagle-push.timer /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now beagle-monitor beagle-push.timer
-sudo cp deploy/nakedk-dashboard.service /etc/systemd/system/
-sudo systemctl enable --now nakedk-dashboard
-```
-
-## Data
-
-Binance public endpoints (`data-api.binance.vision`). No API key required.
-
-## What this is / is not
-
-**It is:**
-
-- a deterministic price-action analysis engine;
-- a multi-frequency event monitor;
-- a structured briefing generator with a review rubric.
-
-**It is not:**
-
-- a trading executor;
-- a prediction engine with a validated edge;
-- investment advice.
-
-## Scope and disclaimer
-
-This is an analysis and monitoring toolkit, not a trading system. It does not execute orders and makes **no historical performance claims**. Outputs are technical readings of price action and are **not investment advice**.
-
-## License and watermark
-
-[PolyForm Noncommercial License 1.0.0](LICENSE) — source-available, **noncommercial use only**.
-Core modules carry a traceable watermark (`WM: NKA-XXXXXXXX`, see [WATERMARK.md](WATERMARK.md)); removing it violates the license.
-
-Required Notice: Copyright (c) 2026 William-Trader (https://github.com/William-Trader)
-
----
-
-## 中文说明
-
-**零依赖的价格行为（裸K）分析与多频监测工具包。**
-
-- **`nakedk`**：确定性分析引擎（特征、状态、信号、评分、历史回放）。
-- **`beagle`**：1m/5m 事件监测 + SQLite 状态 + 去重/冷却/限流 + 推送桥。
-- **`knowledge`**：9 个价格行为模块（市场结构、逐K、Setup、主力、决策树、输出模板、OCR 提纯、Al Brooks 深度框架、评审标准）。
-
-```bash
-python3 -m unittest discover -s tests
-python3 -m nakedk fetch BTCUSDT ETHUSDT
-python3 -m nakedk signal BTCUSDT ETHUSDT
-python3 -m beagle status
-```
-
-许可：PolyForm Noncommercial 1.0.0（非商用）。仅用于学习与技术分析，不构成投资建议；不声明任何历史业绩。
+Required Notice: Copyright (c) 2026 The naked-k-analysis Authors
