@@ -2,10 +2,53 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import time
 
 from . import store
+
+
+def cli_path() -> str:
+    """Resolve the OpenClaw CLI even when systemd PATH is minimal."""
+    env = os.environ.get("BEAGLE_OPENCLAW_CLI")
+    if env and os.path.exists(env):
+        return env
+    found = shutil.which("openclaw")
+    if found:
+        return found
+    for cand in ("/home/ubuntu/.npm-global/bin/openclaw",
+                 "/usr/local/bin/openclaw",
+                 "/opt/homebrew/bin/openclaw"):
+        if os.path.exists(cand):
+            return cand
+    return "openclaw"
+
+
+def load_env_file(path: str) -> None:
+    """Load KEY=VALUE lines (systemd EnvironmentFile equivalent)."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, val = line.split("=", 1)
+                os.environ.setdefault(key.strip(), val.strip().strip('"').strip("'"))
+    except FileNotFoundError:
+        return
+    except Exception:
+        return
+
+
+def resolve_target(cfg: dict, db_path: str):
+    target = os.environ.get("BEAGLE_QQ_TARGET")
+    if target:
+        return target
+    path = os.environ.get("BEAGLE_ENV_FILE") or os.path.join(
+        os.path.dirname(db_path) or ".", ".beagle.env")
+    load_env_file(path)
+    return os.environ.get("BEAGLE_QQ_TARGET")
 
 
 def _quiet(hour: int, cfg: dict) -> bool:
@@ -14,7 +57,7 @@ def _quiet(hour: int, cfg: dict) -> bool:
 
 
 def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20):
-    target = os.environ.get("BEAGLE_QQ_TARGET")
+    target = resolve_target(cfg, db_path)
     alerts = store.pending_alerts(db_path, limit)
     results = []
     for a in alerts:
@@ -27,7 +70,7 @@ def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20
         if not target:
             results.append({"id": a["id"], "status": "no_target"})
             continue
-        cmd = ["openclaw", "message", "send", "--channel", "qqbot",
+        cmd = [cli_path(), "message", "send", "--channel", "qqbot",
                "--target", target, "--message", a["text"]]
         try:
             p = subprocess.run(cmd, capture_output=True, text=True, timeout=90)

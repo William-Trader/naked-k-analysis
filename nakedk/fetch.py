@@ -28,6 +28,7 @@ from .flow import analyse as flow_analyse, classify as flow_classify
 from .micro import analyse as micro_analyse
 from .volstruct import analyse as volstruct_analyse
 from .cross import analyse as cross_analyse
+from .trades import trades as trades_analyse, book as book_analyse
 from .signalbar import score as signalbar_score
 
 BASE = "https://data-api.binance.vision"
@@ -259,6 +260,24 @@ def summarise(symbol: str) -> tuple[str, dict]:
                     f"CROSS|{base}|corr30={cr.get('corr_30d')}|btc30={cr.get('btc_30d')}"
                     f"|eth30={cr.get('eth_30d')}|rs={cr.get('relative_strength')}"
                     f"|ethbtc={cr.get('ethbtc_trend', 'NA')}"
+                )
+        except Exception:
+            pass
+        try:
+            tr = trades_analyse(symbol)
+            if tr:
+                lines.append(
+                    f"TRADES|{base}|n={tr['n']}|delta={tr['delta']}|avg={tr['avg']}"
+                    f"|max={tr['max']}|big={tr['big']}"
+                )
+        except Exception:
+            pass
+        try:
+            bk = book_analyse(symbol)
+            if bk:
+                lines.append(
+                    f"BOOK|{base}|imb={bk['imbalance']}|bid={bk['bid_q']}"
+                    f"|ask={bk['ask_q']}|spread_bp={bk['spread_bp']}"
                 )
         except Exception:
             pass

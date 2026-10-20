@@ -9,4 +9,5 @@ User=ubuntu
 WorkingDirectory=/opt/naked-k-analysis/beagle-app
 Environment=BEAGLE_CONFIG=/opt/naked-k-analysis/beagle-app/config/beagle.json
 EnvironmentFile=-/opt/naked-k-analysis/beagle-app/.beagle.env
+Environment=PATH=/home/ubuntu/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
 ExecStart=/usr/bin/python3 -m beagle push --send
