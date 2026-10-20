@@ -286,6 +286,12 @@ def arbitrate(pats, f):
                 x["mtf"] = "aligned"
             else:
                 x["mtf"] = "neutral"
+        mults = f.get("adapt_mult")
+        if isinstance(mults, dict):
+            am = float(mults.get(x.get("type"), 1.0))
+            if am != 1.0:
+                x["score"] *= am
+                x["adapt"] = am
         x["score"] = round(x["score"], 1)
     pats.sort(key=lambda x: x["score"], reverse=True)
     primary = pats[0] if pats else None

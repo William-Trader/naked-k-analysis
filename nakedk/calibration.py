@@ -6,6 +6,7 @@ toward the base rate so small samples cannot inflate confidence.
 """
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import time
@@ -16,6 +17,16 @@ PRIOR_N = 20
 MIN_N = 20
 CONF_CAP = (35, 65)
 _CACHE: dict = {}
+
+
+def load_multipliers(path: str) -> dict:
+    """Read adaptive per-setup multipliers (empty dict when absent)."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            table = json.load(fh)
+        return {k: float(v) for k, v in (table.get("multipliers") or {}).items()}
+    except Exception:
+        return {}
 
 
 def bucket_key(conf: int) -> str:

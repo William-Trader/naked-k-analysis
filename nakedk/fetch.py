@@ -18,7 +18,7 @@ from .trend import trend_score
 from .patterns import arbitrate, detect as detect_patterns
 from .pattern_tracker import states as pattern_states, track as track_patterns
 from .derivs import derivatives
-from .calibration import table_from_db
+from .calibration import table_from_db, load_multipliers
 from .bars import profile_series, closed_bars
 from .structure import structure as structure_of
 from .mtf import alignment as mtf_alignment
@@ -130,6 +130,28 @@ def summarise(symbol: str) -> tuple[str, dict]:
                 f"{k}:{v['p'] * 100:.0f}%(n={v['n']})" for k, v in tbl["buckets"].items()
             )
             lines.append(f"CALIB|{base}|n={tbl['n']}|base={tbl['base_rate']}%|{parts}")
+    except Exception:
+        pass
+    try:
+        here = os.path.dirname(os.path.abspath(__file__))
+        cands = []
+        if os.environ.get("NK_ADAPTIVE"):
+            cands.append(os.environ["NK_ADAPTIVE"])
+        for env in ("NK_CALIB_DB", "BEAGLE_DB"):
+            if os.environ.get(env):
+                cands.append(os.path.join(os.path.dirname(os.environ[env]),
+                                          "state", "adaptive.json"))
+        cands.append(os.path.join(here, "..", "state", "adaptive.json"))
+        cands.append(os.path.join(here, "..", "..", "beagle-app", "state", "adaptive.json"))
+        mults = {}
+        for path in cands:
+            mults = load_multipliers(path)
+            if mults:
+                break
+        if mults:
+            f["adapt_mult"] = mults
+            lines.append("ADAPT|" + base + "|" + "|".join(
+                f"{k}={v}" for k, v in sorted(mults.items())))
     except Exception:
         pass
     arb = arbitrate(detect_patterns(k4, f), f)
