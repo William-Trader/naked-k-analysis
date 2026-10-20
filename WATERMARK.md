@@ -7,6 +7,8 @@
 | File | WM ID |
 |---|---|
 | nakedk/__init__.py | NKA-E95B31BA |
+| nakedk/__main__.py | NKA-5EE7AFA9 |
+| nakedk/backtest.py | NKA-45E4B101 |
 | nakedk/cli.py | NKA-65B91A8F |
 | nakedk/features.py | NKA-05747093 |
 | nakedk/fetch.py | NKA-771AC70B |
@@ -16,4 +18,4 @@
 | scripts/pa_cron_setup.sh | NKA-98995EAC |
 | scripts/pa_run.sh | NKA-B3E5AC11 |
 
-**Total marked files: 9**
+**Total marked files: 11**
