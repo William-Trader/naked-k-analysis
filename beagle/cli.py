@@ -59,6 +59,20 @@ def cmd_score(args):
     return 0
 
 
+def apply_corr_gate(candidates, corr, threshold: float = 0.8):
+    """BTC/ETH with high correlation count as one risk; drop the weaker one."""
+    btc = next((c for c in candidates if c["symbol"] == "BTCUSDT"), None)
+    eth = next((c for c in candidates if c["symbol"] == "ETHUSDT"), None)
+    if not btc or not eth or btc["direction"] != eth["direction"]:
+        return candidates, None
+    if corr is None or corr <= threshold:
+        return candidates, None
+    drop = min(btc, eth, key=lambda c: c.get("confidence") or 0)
+    kept = btc if drop is eth else eth
+    return ([c for c in candidates if c is not drop],
+            {"dropped": drop["symbol"], "kept": kept["symbol"], "corr": corr})
+
+
 def cmd_record(args):
     """Record the current closed-bar stance once per 4h bar (live loop input)."""
     from nakedk.bars import closed_bars
@@ -72,6 +86,7 @@ def cmd_record(args):
     cfg = _cfg(args.config)
     store.init(cfg["db_path"])
     out = []
+    candidates = []
     for symbol in (args.symbols or cfg["symbols"]):
         try:
             ks = closed_bars(klines(symbol, "4h", 200), "4h")
@@ -91,21 +106,45 @@ def cmd_record(args):
                 mtf = mtf_alignment(symbol)["alignment"]
             except Exception:
                 mtf = None
-            setup = (arb.get("primary") or {}).get("type") or "NONE"
-            sid = store.add_signal(cfg["db_path"], {
-                "ts": bar_ts, "symbol": symbol,
-                "direction": s["direction"], "confidence": s.get("confidence"),
+            candidates.append({
+                "symbol": symbol, "ts": bar_ts, "direction": s["direction"],
+                "confidence": s.get("confidence"),
                 "entry": s.get("entry") or f["price"],
                 "stop": s.get("stop"), "target": s.get("target"),
-                "horizon_h": 4, "source": "live",
-                "setup": setup,
-                "regime": stc.get("state"), "mtf_alignment": mtf,
+                "setup": (arb.get("primary") or {}).get("type") or "NONE",
+                "regime": stc.get("state"), "mtf": mtf,
             })
-            out.append({"symbol": symbol, "status": "recorded", "id": sid,
-                        "direction": s["direction"], "setup": setup,
-                        "mtf": mtf, "regime": stc.get("state")})
         except Exception as e:
             out.append({"symbol": symbol, "status": "error", "error": str(e)[:120]})
+
+    corr = None
+    try:
+        from nakedk.cross import correlation
+        b = [float(k[4]) for k in closed_bars(klines("BTCUSDT", "1d", 40), "1d")]
+        e = [float(k[4]) for k in closed_bars(klines("ETHUSDT", "1d", 40), "1d")]
+        rb = [b[i] / b[i - 1] - 1 for i in range(1, len(b)) if b[i - 1]]
+        re = [e[i] / e[i - 1] - 1 for i in range(1, len(e)) if e[i - 1]]
+        corr = correlation(rb, re)
+    except Exception:
+        corr = None
+    candidates, gate = apply_corr_gate(candidates, corr)
+    if gate:
+        out.append({"status": "corr_suppressed", **gate})
+
+    for c in candidates:
+        try:
+            sid = store.add_signal(cfg["db_path"], {
+                "ts": c["ts"], "symbol": c["symbol"], "direction": c["direction"],
+                "confidence": c["confidence"], "entry": c["entry"],
+                "stop": c["stop"], "target": c["target"], "horizon_h": 4,
+                "source": "live", "setup": c["setup"], "regime": c["regime"],
+                "mtf_alignment": c["mtf"],
+            })
+            out.append({"symbol": c["symbol"], "status": "recorded", "id": sid,
+                        "direction": c["direction"], "setup": c["setup"],
+                        "mtf": c["mtf"], "regime": c["regime"], "corr": corr})
+        except Exception as e:
+            out.append({"symbol": c["symbol"], "status": "error", "error": str(e)[:120]})
     print(json.dumps(out, ensure_ascii=False))
     return 0
 
