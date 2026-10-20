@@ -15,6 +15,12 @@ from nakedk.patterns import arbitrate, detect as detect_patterns
 from nakedk.pattern_tracker import states as pattern_states, track as track_patterns
 from nakedk.signals import stance
 from nakedk.trend import trend_score
+from nakedk.bars import profile_series, closed_bars
+from nakedk.structure import structure as structure_of
+from nakedk.mtf import alignment as mtf_alignment
+from nakedk.volume import vpoc
+from nakedk.location import atr_distance, edge_zone, session_levels
+from nakedk.signalbar import score as signalbar_score
 
 DB = os.environ.get("BEAGLE_DB", "/opt/naked-k-analysis/beagle.db")
 DRAWINGS = os.path.join(os.path.dirname(__file__), "..", "drawings.json")
@@ -82,7 +88,13 @@ def build(interval="4h"):
     for sym in ("BTCUSDT", "ETHUSDT"):
         t = ticker(sym)
         ks = klines(sym, interval, 200)
-        f = features_from_klines(ks)
+        k_closed = closed_bars(ks, interval)
+        f = features_from_klines(k_closed)
+        try:
+            mtf = mtf_alignment(sym)
+        except Exception:
+            mtf = {"by_tf": {"1d": 0, "4h": 0, "1h": 0}, "alignment": 0, "label": "unknown"}
+        f["mtf_alignment"] = mtf["alignment"]
         st = stance(f)
         ts = trend_score(f)
         closes = [float(r[4]) for r in ks]
@@ -98,11 +110,27 @@ def build(interval="4h"):
             if candles[i]["l"] == min(x["l"] for x in candles[i - 2:i + 3]):
                 ls.append((i, candles[i]["l"]))
         hs, ls = hs[-8:], ls[-8:]
-        arb = arbitrate(detect_patterns(ks, f), f)
+        arb = arbitrate(detect_patterns(k_closed, f), f)
         try:
             track_patterns(sym, arb["patterns"], PATTERN_DB, f["price"])
         except Exception:
             pass
+        profiles = profile_series(k_closed)
+        bar_profile = profiles[-1] if profiles else {}
+        prev_bar = profiles[-2] if len(profiles) > 1 else None
+        struct_v2 = structure_of(k_closed)
+        vp = vpoc(k_closed)
+        sess = session_levels(closed_bars(klines(sym, "1d", 5), "1d"))
+        lv = struct_v2.get("levels", {})
+        loc = {
+            "edge": edge_zone(f.get("pos20")),
+            "to_swing_hi": atr_distance(f["price"], lv.get("swing_high"), struct_v2.get("atr")),
+            "to_swing_lo": atr_distance(f["price"], lv.get("swing_low"), struct_v2.get("atr")),
+            "prev_day": sess,
+        }
+        _pdir = ("long" if (arb["primary"] or {}).get("direction") == "bullish"
+                 else "short" if (arb["primary"] or {}).get("direction") == "bearish" else None)
+        sb = signalbar_score(bar_profile, prev_bar, _pdir, f.get("pos20")) if _pdir else {}
         out["symbols"][sym] = {
             "price": f["price"],
             "change24h": float(t["priceChangePercent"]),
@@ -129,6 +157,12 @@ def build(interval="4h"):
             "pattern_context": arb["context"],
             "pattern_states": pattern_states(sym, PATTERN_DB, 8),
             "structure": structure_label(hs, ls),
+            "structure_v2": struct_v2,
+            "bar": bar_profile,
+            "mtf": mtf,
+            "volume_profile": vp,
+            "location": loc,
+            "signalbar": sb,
         }
     try:
         conn = sqlite3.connect(DB, timeout=5)

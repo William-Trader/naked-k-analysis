@@ -271,7 +271,22 @@ def arbitrate(pats, f):
     for x in pats:
         x["context"] = ctx
         x["fit"] = round(_fit(x, ctx, f), 2)
-        x["score"] = round(x["quality"] * (0.5 + 0.5 * x["fit"]), 1)
+        x["score"] = x["quality"] * (0.5 + 0.5 * x["fit"])
+        mtf = f.get("mtf_alignment")
+        if mtf is not None and x.get("direction") in ("bullish", "bearish"):
+            conflict = ((mtf >= 2 and x["direction"] == "bearish")
+                        or (mtf <= -2 and x["direction"] == "bullish"))
+            aligned = ((mtf >= 2 and x["direction"] == "bullish")
+                       or (mtf <= -2 and x["direction"] == "bearish"))
+            if conflict:
+                x["score"] *= 0.55
+                x["mtf"] = "conflict"
+            elif aligned:
+                x["score"] *= 1.15
+                x["mtf"] = "aligned"
+            else:
+                x["mtf"] = "neutral"
+        x["score"] = round(x["score"], 1)
     pats.sort(key=lambda x: x["score"], reverse=True)
     primary = pats[0] if pats else None
     secondary = None

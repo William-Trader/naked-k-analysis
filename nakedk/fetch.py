@@ -19,6 +19,12 @@ from .patterns import arbitrate, detect as detect_patterns
 from .pattern_tracker import states as pattern_states, track as track_patterns
 from .derivs import derivatives
 from .calibration import table_from_db
+from .bars import profile_series, closed_bars
+from .structure import structure as structure_of
+from .mtf import alignment as mtf_alignment
+from .volume import vpoc, effort_result, divergence
+from .location import atr_distance, edge_zone, session_levels
+from .signalbar import score as signalbar_score
 
 BASE = "https://data-api.binance.vision"
 CST = timezone(timedelta(hours=8))
@@ -47,8 +53,14 @@ def fmt(x, nd=2) -> str:
 def summarise(symbol: str) -> tuple[str, dict]:
     """Return (human text, features) for one symbol."""
     t = ticker(symbol)
-    k4 = klines(symbol, "4h", 200)
+    k4 = closed_bars(klines(symbol, "4h", 200), "4h")
     f = features_from_klines(k4)
+    try:
+        mtf = mtf_alignment(symbol)
+        f["mtf_alignment"] = mtf["alignment"]
+        f["mtf_label"] = mtf["label"]
+    except Exception:
+        mtf = {"by_tf": {"1d": 0, "4h": 0, "1h": 0}, "alignment": 0, "label": "unknown"}
     base = symbol[:-4] if symbol.endswith("USDT") else symbol
 
     lines = [f"===== {symbol} ====="]
@@ -135,6 +147,56 @@ def summarise(symbol: str) -> tuple[str, dict]:
             lines.append(f"PATTERN_STATE|{base}|{stt['type']}|{stt['direction']}|{stt['status']}|quality={stt['quality']}")
     except Exception:
         pass
+    try:
+        profiles = profile_series(k4)
+        bar = profiles[-1] if profiles else {}
+        prev_bar = profiles[-2] if len(profiles) > 1 else None
+        if bar:
+            lines.append(
+                f"BAR|{base}|type={bar['type']}|q={bar['quality']}|body={bar['body_ratio']}"
+                f"|close_pos={bar['close_pos']}|upper={bar['upper_tail']}|lower={bar['lower_tail']}"
+                f"|range_atr={bar['range_atr']}|vol_z={bar['vol_z']}"
+            )
+        stc = structure_of(k4)
+        lv = stc.get("levels", {})
+        bos = stc.get("bos") or {}
+        choch = stc.get("choch") or {}
+        lines.append(
+            f"STRUCT|{base}|state={stc.get('state')}|prior={stc.get('prior_state')}"
+            f"|swing_high={lv.get('swing_high', 'NA')}|swing_low={lv.get('swing_low', 'NA')}"
+            f"|bos={bos.get('kind', 'none')}@{bos.get('level', 'NA')}"
+            f"|choch={choch.get('kind', 'none')}@{choch.get('level', 'NA')}"
+        )
+        lines.append(
+            f"MTF|{base}|d1={mtf['by_tf']['1d']:+d}|h4={mtf['by_tf']['4h']:+d}"
+            f"|h1={mtf['by_tf']['1h']:+d}|alignment={mtf['alignment']:+d}|label={mtf['label']}"
+        )
+        sess = session_levels(closed_bars(klines(symbol, "1d", 5), "1d"))
+        atr_val = stc.get("atr")
+        lines.append(
+            f"LOC|{base}|edge={edge_zone(f.get('pos20'))}"
+            f"|to_swing_hi={atr_distance(f['price'], lv.get('swing_high'), atr_val)}"
+            f"|to_swing_lo={atr_distance(f['price'], lv.get('swing_low'), atr_val)}"
+            f"|to_prev_day={atr_distance(f['price'], sess.get('prev_day_high'), atr_val)}"
+            f"|prev_day={sess.get('prev_day_low', 'NA')}-{sess.get('prev_day_high', 'NA')}"
+        )
+        vp = vpoc(k4)
+        va = vp.get("value_area") or [None, None]
+        lines.append(
+            f"VOLP|{base}|poc={vp.get('poc', 'NA')}|va={va[0]}-{va[1]}"
+            f"|effort={effort_result(bar)}|div={divergence(profiles) or 'none'}"
+        )
+        pdir = ("long" if prim.get("direction") == "bullish"
+                else "short" if prim.get("direction") == "bearish" else None)
+        if bar and pdir:
+            sbs = signalbar_score(bar, prev_bar, pdir, f.get("pos20"))
+            parts_s = " ".join(k + "=" + str(v) for k, v in sbs["parts"].items())
+            miss_s = ",".join(sbs["missing"]) or "none"
+            lines.append(
+                f"SIGBAR|{base}|dir={pdir}|score={sbs['score']}|{parts_s}|missing={miss_s}"
+            )
+    except Exception as e:
+        lines.append(f"BAR_ERR|{base}|{str(e)[:80]}")
     lines.append("")
     lines.append("--- 4h candles (last 42, newest last) ---")
     lines.append("time (CST)        open       high       low        close      chg%    vol z")

@@ -35,6 +35,24 @@ def klines_1h(symbol: str, start_ms: int, end_ms: int):
         return json.loads(r.read().decode())
 
 
+def klines_1m(symbol: str, start_ms: int, end_ms: int, max_bars: int = 2000):
+    """1m bars for intrabar ordering (stop vs target)."""
+    out, cursor = [], start_ms
+    while cursor < end_ms and len(out) < max_bars:
+        url = (f"{BASE}/api/v3/klines?symbol={symbol}&interval=1m"
+               f"&startTime={cursor}&endTime={end_ms}&limit=1000")
+        req = Request(url, headers={"User-Agent": "naked-k-analysis/2.0"})
+        with urlopen(req, timeout=20) as r:
+            rows = json.loads(r.read().decode())
+        if not rows:
+            break
+        out.extend(rows)
+        cursor = rows[-1][0] + 60_000
+        if len(rows) < 1000:
+            break
+    return out[:max_bars]
+
+
 def _index_at(ks, ts: int):
     for i, k in enumerate(ks):
         if k[0] <= ts < k[0] + 3600_000:

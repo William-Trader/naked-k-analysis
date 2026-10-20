@@ -101,6 +101,14 @@ def init(path: str) -> None:
         ):
             if col not in cols:
                 conn.execute(ddl)
+        ocols = [r[1] for r in conn.execute("PRAGMA table_info(outcomes)").fetchall()]
+        for col, ddl in (
+            ("mfe_pct", "ALTER TABLE outcomes ADD COLUMN mfe_pct REAL"),
+            ("mae_pct", "ALTER TABLE outcomes ADD COLUMN mae_pct REAL"),
+            ("first_touch", "ALTER TABLE outcomes ADD COLUMN first_touch TEXT"),
+        ):
+            if col not in ocols:
+                conn.execute(ddl)
         conn.commit()
     finally:
         conn.close()

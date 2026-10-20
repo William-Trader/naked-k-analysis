@@ -284,6 +284,11 @@ function syncTools(sym){
 }
 function card(sym,s){
   var tr=s.trend||{},st=s.stance||{},dir=st.direction||'neutral';
+  var mtf=s.mtf||{},sv=s.structure_v2||{},bp=s.bar||{},sb=s.signalbar||{};
+  var mtfTxt='MTF '+(mtf.alignment==null?'—':(mtf.alignment>0?'+'+mtf.alignment:String(mtf.alignment)))+' '+(mtf.label||'—');
+  var stTxt='结构 '+(sv.state||'—')+((sv.bos&&sv.bos.kind)?' · BOS '+sv.bos.kind:'')+((sv.choch&&sv.choch.kind)?' · CHoCH '+sv.choch.kind:'');
+  var barTxt='BAR '+(bp.type||'—')+' q'+(bp.quality==null?'—':bp.quality);
+  var sbTxt=(sb.score==null)?'':' · 信号K '+sb.score;
   var sc=tr.score||50,label=tr.label||'neutral',ai=tr.always_in||'neutral';
   function pstate(t,d){var a=s.pattern_states||[];for(var i=0;i<a.length;i++){if(a[i].type===t&&a[i].direction===d)return a[i].status;}return '';}var prim=s.primary_pattern,sec=s.secondary_pattern;var pats='';if(prim){var c=prim.direction==='bullish'?'var(--up)':prim.direction==='bearish'?'var(--down)':'var(--gold)';var pst=pstate(prim.type,prim.direction);pats+='<span class="pill" style="color:'+c+';border:1px solid '+c+'">主：'+prim.label+' · '+prim.quality+(pst?' · '+pst:'')+'</span>';}if(sec){var c2=sec.direction==='bullish'?'var(--up)':sec.direction==='bearish'?'var(--down)':'var(--gold)';var sst=pstate(sec.type,sec.direction);pats+='<span class="pill" style="color:'+c2+';border:1px solid '+c2+'">备：'+sec.label+' · '+sec.quality+(sst?' · '+sst:'')+'</span>';}var sup=(s.patterns||[]).filter(function(x){return x.role==='suppressed';}).length;if(!prim)pats='<span class="muted" style="font-size:11px">无标准形态</span>';pats+='<span class="muted" style="font-size:10px"> · 上下文 '+(s.pattern_context||'—')+' · 过滤 '+sup+' 个</span>';
   var sig='方向 <span class="pill" style="color:'+C[dir]+';border:1px solid '+C[dir]+'">'+dir+'</span> · 置信度 <b>'+(st.confidence||'—')+'</b>';
@@ -298,6 +303,7 @@ function card(sym,s){
     +'<div class="gauge"><div class="gauge-head"><span>Always-In: <b style="color:'+C[ai]+'">'+ai+'</b></span><span>0 — 100</span></div><div class="bar"><div class="fill" style="width:'+sc+'%"></div></div></div>'
     +'<div class="stats"><div class="stat"><b>'+fmt(s.adx,1)+'</b><i>ADX</i></div><div class="stat"><b>'+fmt(s.rsi,1)+'</b><i>RSI</i></div><div class="stat"><b>'+fmt(s.atr_pct,2)+'%</b><i>ATR</i></div><div class="stat"><b>'+fmt(s.vol_z,2)+'</b><i>VOL Z</i></div><div class="stat"><b>'+Math.round((s.pos20||0)*100)+'%</b><i>POS20</i></div></div>'
     +'<div class="levels">支撑 <b>'+fmt(s.r20_lo,1)+'</b> / '+fmt((s.swing_lows||[]).slice(-1)[0]||s.low24h,1)+' · 阻力 <b>'+fmt(s.r20_hi,1)+'</b> / '+fmt((s.swing_highs||[]).slice(-1)[0]||s.high24h,1)+'</div>'
+    +'<div class="levels">'+mtfTxt+' · '+stTxt+' · '+barTxt+sbTxt+'</div>'
     +'<div class="sig">'+sig+'</div>'
     +'<div style="margin-top:7px;font-size:11px;color:var(--muted)">结构：'+(s.structure||'—')+' · 形态：'+pats+'</div>'
     +'<div class="tools"><button data-ind="ema" class="on">EMA</button><button data-ind="vol" class="on">VOL</button><button data-mode="hline">水平线</button><button data-mode="trend">趋势线</button><button data-mode="clear">清除画线</button><button data-full="1">全屏</button></div>'

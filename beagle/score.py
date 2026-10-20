@@ -1,7 +1,7 @@
 """Outcome scoring for stored signals (4h default)."""
 from __future__ import annotations
 
-from nakedk.score import klines_1h
+from nakedk.score import klines_1h, klines_1m
 
 from .store import connect
 
@@ -10,6 +10,45 @@ def _index_at(ks, ts: int):
     for i, k in enumerate(ks):
         if k[0] <= ts < k[0] + 3600_000:
             return i
+    return None
+
+
+def excursions(ks, i, horizon: int, direction: str):
+    """Max favourable / adverse excursion over the holding window."""
+    entry = float(ks[i][4])
+    seg = ks[i + 1:i + horizon + 1]
+    if not seg or not entry:
+        return None, None
+    hi = max(float(k[2]) for k in seg)
+    lo = min(float(k[3]) for k in seg)
+    if direction == "long":
+        return round((hi - entry) / entry * 100.0, 3), round((lo - entry) / entry * 100.0, 3)
+    if direction == "short":
+        return round((entry - lo) / entry * 100.0, 3), round((entry - hi) / entry * 100.0, 3)
+    return None, None
+
+
+def first_touch(symbol: str, ts: int, horizon: int, direction: str, stop, target):
+    """Which level price reached first, using 1m bars. Same-bar ambiguity -> stop."""
+    if not stop or not target:
+        return None
+    try:
+        ks = klines_1m(symbol, ts, ts + horizon * 3600_000)
+    except Exception:
+        return None
+    for k in ks:
+        high = float(k[2])
+        low = float(k[3])
+        if direction == "long":
+            if low <= float(stop):
+                return "stop"
+            if high >= float(target):
+                return "target"
+        elif direction == "short":
+            if high >= float(stop):
+                return "stop"
+            if low <= float(target):
+                return "target"
     return None
 
 
@@ -41,10 +80,14 @@ def score_pending(db_path: str) -> int:
                 hit = 1 if ret > 0 else 0
             elif r["direction"] == "short":
                 hit = 1 if ret < 0 else 0
+            mfe, mae = excursions(ks, i, horizon, r["direction"])
+            ft = first_touch(r["symbol"], ts, horizon, r["direction"],
+                             r["stop"], r["target"])
             conn.execute(
-                "INSERT OR REPLACE INTO outcomes (signal_id, horizon_h, ts, price, ret_pct, hit) "
-                "VALUES (?,?,?,?,?,?)",
-                (r["id"], horizon, ts, exit_, ret, hit),
+                "INSERT OR REPLACE INTO outcomes "
+                "(signal_id, horizon_h, ts, price, ret_pct, hit, mfe_pct, mae_pct, first_touch) "
+                "VALUES (?,?,?,?,?,?,?,?,?)",
+                (r["id"], horizon, ts, exit_, ret, hit, mfe, mae, ft),
             )
             scored += 1
         conn.commit()
