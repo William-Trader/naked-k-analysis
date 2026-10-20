@@ -45,3 +45,36 @@ strategy" claim. What ships instead:
 
 If a future rule survives walk-forward on both symbols, it belongs here
 with the same level of evidence.
+
+## Extended check: 730 days x 5 symbols
+
+Same engine, no parameter fitting, 2 years of 4h bars (4380 bars each):
+
+| Symbol | Trades | Hit rate | Avg / trade | Cumulative | Max DD |
+|---|---|---|---|---|---|
+| BTCUSDT | 810 | 49.6% | -0.010% | **-10.82%** | -26.85% |
+| ETHUSDT | 775 | 48.8% | -0.078% | **-49.67%** | -58.67% |
+| SOLUSDT | 831 | 47.4% | -0.135% | **-70.82%** | -73.11% |
+| BNBUSDT | 906 | 49.0% | -0.022% | **-22.44%** | -32.85% |
+| XRPUSDT | 1059 | 48.6% | -0.059% | **-53.86%** | -74.10% |
+
+All five symbols are net negative **before fees and funding**. This rules out
+"BTC/ETH was just an unlucky regime" as the explanation: the rule family
+itself has no edge on this sample.
+
+## What this means for the roadmap
+
+We will not tune thresholds until the backtest turns green — with 5 symbols,
+2 years and 72 rule variants already tested, that would be curve-fitting.
+The honest next step is a different hypothesis, not a different threshold:
+
+1. **cross-sectional momentum** across the top-N USDT universe (relative
+   strength, monthly rebalance) rather than single-symbol 4h timing;
+2. **regime-conditioned** rules (only trade when the higher-timeframe trend
+   and volatility regime agree);
+3. **longer history** and **funding/basis** data, which are not in the
+   current 4h OHLCV set.
+
+Any candidate must survive the same walk-forward protocol and be reported
+here with the same honesty.
+
