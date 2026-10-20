@@ -174,6 +174,17 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps(load_drawings().get(sym, []), ensure_ascii=False).encode("utf-8"),
                        "application/json; charset=utf-8")
             return
+        if urlparse(self.path).path == "/api/calibration":
+            try:
+                from nakedk.calibration import table_from_db
+                db = os.environ.get("NK_CALIB_DB") or os.path.join(
+                    os.path.dirname(__file__), "..", "beagle.db")
+                self._send(json.dumps(table_from_db(db), ensure_ascii=False).encode("utf-8"),
+                           "application/json; charset=utf-8")
+            except Exception as e:
+                self._send(json.dumps({"error": str(e)[:200]}).encode("utf-8"),
+                           "application/json; charset=utf-8", 500)
+            return
         if urlparse(self.path).path.startswith("/api/overview"):
             interval = (q.get("interval") or ["4h"])[0]
             self._send(json.dumps(build(interval), ensure_ascii=False).encode("utf-8"),
