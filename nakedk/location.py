@@ -30,7 +30,7 @@ def session_levels(daily_ks_or_rows) -> dict:
 
 
 def plan_from_context(price, direction, struct, atr, rr_min: float = 1.5,
-                      risk_pct: float = 0.5, ttl_h: int = 8):
+                      risk_pct: float = 0.5, ttl_h: int = 8, pattern=None):
     """Executable plan with one source of truth; nearest valid target wins."""
     if direction not in ("bullish", "bearish") or not price or not atr:
         return None
@@ -46,6 +46,7 @@ def plan_from_context(price, direction, struct, atr, rr_min: float = 1.5,
         if lv.get("swing_high") and lv["swing_high"] > price:
             candidates.append(("structure", float(lv["swing_high"])))
         candidates += [("atr_2.5r", price + 2.5 * risk), ("atr_3r", price + 3.0 * risk)]
+        _add_pattern_candidate(candidates, pattern, price, "long")
     else:
         struct_stop = lv.get("swing_high")
         stop = (struct_stop if struct_stop and struct_stop - price <= 2.0 * atr
@@ -56,6 +57,7 @@ def plan_from_context(price, direction, struct, atr, rr_min: float = 1.5,
         if lv.get("swing_low") and lv["swing_low"] < price:
             candidates.append(("structure", float(lv["swing_low"])))
         candidates += [("atr_2.5r", price - 2.5 * risk), ("atr_3r", price - 3.0 * risk)]
+        _add_pattern_candidate(candidates, pattern, price, "short")
     if risk <= 0:
         return None
     best = None
@@ -78,6 +80,20 @@ def plan_from_context(price, direction, struct, atr, rr_min: float = 1.5,
             "stop_pct": round(stop_pct, 2), "risk_pct": risk_pct,
             "notional_pct": round(notional, 1), "ttl_h": ttl_h,
             "invalidate": "4h收盘" + ("<" if side == "long" else ">") + f" {round(stop, 2)}"}
+
+
+def _add_pattern_candidate(candidates, pattern, price, side):
+    if not pattern:
+        return
+    target = pattern.get("target")
+    if target is None:
+        return
+    try:
+        t = float(target)
+    except (TypeError, ValueError):
+        return
+    if (side == "long" and t > price) or (side == "short" and t < price):
+        candidates.insert(0, ("pattern_mm", t))
 
 
 def measured_move(pattern_height: float, breakout_level: float, direction: str):

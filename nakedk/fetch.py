@@ -25,6 +25,8 @@ from .mtf import alignment as mtf_alignment
 from .volume import vpoc, effort_result, divergence
 from .location import atr_distance, edge_zone, session_levels, plan_from_context
 from .flow import analyse as flow_analyse, classify as flow_classify
+from .regime import arbitrate as arbitrate_regime
+from .events import failed_break, follow_through
 from .micro import analyse as micro_analyse
 from .volstruct import analyse as volstruct_analyse
 from .cross import analyse as cross_analyse
@@ -198,6 +200,13 @@ def summarise(symbol: str) -> tuple[str, dict]:
             f"MTF|{base}|d1={mtf['by_tf']['1d']:+d}|h4={mtf['by_tf']['4h']:+d}"
             f"|h1={mtf['by_tf']['1h']:+d}|alignment={mtf['alignment']:+d}|label={mtf['label']}"
         )
+        reg = arbitrate_regime(stc.get("state"), (mtf.get("by_state") or {}).get("1d"),
+                               mtf.get("alignment"), f.get("adx14"),
+                               f.get("adx_slope"), f.get("overlap"))
+        lines.append(
+            f"REGIME|{base}|regime={reg['regime']}|conf={reg['confidence']}"
+            f"|conflict={int(reg['conflict'])}|notes={';'.join(reg['notes']) or 'none'}"
+        )
         sess = session_levels(closed_bars(klines(symbol, "1d", 5), "1d"))
         atr_val = stc.get("atr")
         lines.append(
@@ -281,7 +290,21 @@ def summarise(symbol: str) -> tuple[str, dict]:
                 )
         except Exception:
             pass
-        plan = plan_from_context(f["price"], prim.get("direction"), stc, stc.get("atr"))
+        fb = failed_break(k4, stc.get("atr"))
+        if fb:
+            lines.append(
+                f"FAILED|{base}|kind={fb['kind']}|level={fb['level']}|bars_since={fb['bars_since']}"
+            )
+        pdir0 = ("long" if prim.get("direction") == "bullish"
+                 else "short" if prim.get("direction") == "bearish" else None)
+        if pdir0:
+            ft = follow_through(k4, pdir0)
+            if ft:
+                lines.append(
+                    f"FOLLOW|{base}|dir={pdir0}|ok={int(ft['ok'])}|close_pos={ft['close_pos']}"
+                )
+        plan = plan_from_context(f["price"], prim.get("direction"), stc,
+                                 stc.get("atr"), pattern=prim)
         if plan:
             lines.append("PLAN|" + base + "|" + "|".join(
                 f"{k}={v}" for k, v in plan.items()))

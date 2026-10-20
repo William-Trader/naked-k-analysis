@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from .bars import closed_bars
 from .features import ema
+from .structure import structure
 
 
 def tf_sign(ks) -> int:
@@ -25,12 +26,15 @@ def tf_sign(ks) -> int:
 def alignment(symbol: str, klines_fn=None, now_ms=None) -> dict:
     if klines_fn is None:
         from .fetch import klines as klines_fn
-    by = {}
+    by, states = {}, {}
     for tf, limit in (("1d", 120), ("4h", 200), ("1h", 200)):
         try:
-            by[tf] = tf_sign(closed_bars(klines_fn(symbol, tf, limit), tf, now_ms))
+            ks = closed_bars(klines_fn(symbol, tf, limit), tf, now_ms)
+            by[tf] = tf_sign(ks)
+            states[tf] = structure(ks).get("state")
         except Exception:
             by[tf] = 0
+            states[tf] = None
     total = sum(by.values())
     if total >= 2:
         label = "aligned_up"
@@ -40,5 +44,5 @@ def alignment(symbol: str, klines_fn=None, now_ms=None) -> dict:
         label = "neutral"
     else:
         label = "mixed"
-    return {"by_tf": by, "alignment": total, "label": label}
+    return {"by_tf": by, "by_state": states, "alignment": total, "label": label}
 

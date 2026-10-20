@@ -47,7 +47,7 @@ def update(table: dict, by_setup: dict, base_rate: float,
     streaks = table.setdefault("streaks", {})
     log = table.setdefault("log", [])
     for setup, st in by_setup.items():
-        n = st.get("n", 0)
+        n = int(st.get("n_eff", st.get("n", 0)) or 0)
         old = float(mults.get(setup, 1.0))
         if n < min_n or st.get("hit_rate") is None:
             continue

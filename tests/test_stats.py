@@ -12,12 +12,13 @@ class TestStats(unittest.TestCase):
         self.assertGreater(lo2, 65)
 
     def test_summarize_reliable(self):
-        rows = [{"hit": 1, "ret_pct": 1.0}] * (MIN_N - 1)
+        rows = [{"hit": 1, "ret_pct": 1.0}] * (MIN_N * 2 - 1)
         self.assertFalse(summarize(rows)["reliable"])
         rows.append({"hit": 0, "ret_pct": -1.0})
         s = summarize(rows)
         self.assertTrue(s["reliable"])
-        self.assertEqual(s["n"], MIN_N)
+        self.assertEqual(s["n"], MIN_N * 2)
+        self.assertLess(s["n_eff"], s["n"])
 
     def test_bucket_groups(self):
         rows = [{"setup": "L1", "hit": 1}, {"setup": "L1", "hit": 0}, {"setup": "DB", "hit": 1}]

@@ -18,6 +18,8 @@ def trend_score(f: dict) -> dict:
     adx = f.get("adx14") or 0.0
     pos = f.get("pos20")
     ret24 = f.get("ret24h") or 0.0
+    adx_slope = f.get("adx_slope") or 0.0
+    ema_slope = f.get("ema_slope") or 0.0
 
     if e20 is None or e50 is None or p is None:
         return {"score": 50, "label": "neutral", "always_in": "neutral",
@@ -28,7 +30,14 @@ def trend_score(f: dict) -> dict:
     pos_s = (_clamp(pos if pos is not None else 0.5) - 0.5) * 2.0
     mom = _clamp(ret24 / 3.0, -1.0, 1.0)
 
-    score = 50.0 + 20.0 * ema * strength + 10.0 * pos_s + 10.0 * mom
+    slope = 0.0
+    if ema:
+        slope += 5.0 if (ema > 0 and ema_slope > 0) or (ema < 0 and ema_slope < 0) else -5.0
+    if adx_slope >= 2:
+        slope += 3.0
+    elif adx_slope <= -2:
+        slope -= 3.0
+    score = 50.0 + 20.0 * ema * strength + 10.0 * pos_s + 10.0 * mom + slope
     score = _clamp(score)
     if adx < 20:
         score = 50.0 + (score - 50.0) * 0.4
@@ -54,5 +63,6 @@ def trend_score(f: dict) -> dict:
             "adx": round(strength, 2),
             "pos": round(pos_s, 2),
             "mom": round(mom, 2),
+            "slope": round(slope, 1),
         },
     }

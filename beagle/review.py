@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 
-from nakedk.stats import bucket, summarize
+from nakedk.stats import bh_significant, binom_p, bucket, summarize
 
 from . import adaptive, store
 
@@ -58,7 +58,16 @@ def build(db_path: str, adaptive_path: str | None = None, apply: bool = False) -
         "by_regime": bucket(rows, lambda r: r.get("regime") or "unknown"),
         "by_mtf": bucket(rows, _mtf_key),
         "by_confidence": bucket(rows, lambda r: str((int(r.get("confidence") or 50) // 5) * 5)),
+        "by_setup_regime": bucket(
+            rows, lambda r: (r.get("setup") or "NONE") + "|" + (r.get("regime") or "unknown")),
     }
+    pvals = []
+    for k, v in report["by_setup"].items():
+        if v["n"] >= 10:
+            hits = int(round(v["hit_rate"] * v["n"] / 100.0))
+            v["p_value"] = round(binom_p(hits, v["n"]), 3)
+            pvals.append((k, v["p_value"]))
+    report["significant_setups"] = bh_significant(pvals, alpha=0.1)
     report["reliable_setups"] = [k for k, v in report["by_setup"].items() if v["reliable"]]
     if adaptive_path:
         table = adaptive.load(adaptive_path)
