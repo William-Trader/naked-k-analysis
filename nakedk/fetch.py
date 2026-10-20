@@ -14,6 +14,7 @@ from urllib.request import Request, urlopen
 
 from .features import features_from_klines
 from .trend import trend_score
+from .patterns import detect as detect_patterns
 
 BASE = "https://data-api.binance.vision"
 CST = timezone(timedelta(hours=8))
@@ -90,6 +91,11 @@ def summarise(symbol: str) -> tuple[str, dict]:
     ts = trend_score(f)
     lines.append(f"TREND|{base}|score={ts['score']}|label={ts['label']}|always_in={ts['always_in']}|ema={ts['components']['ema']}|adx={ts['components']['adx']}|pos={ts['components']['pos']}|mom={ts['components']['mom']}")
     lines.append(f"trend: {ts['score']}/100 ({ts['label']}, Always-In={ts['always_in']})")
+    pats = detect_patterns(k4, f)
+    for pp in pats:
+        lines.append(f"PATTERN|{base}|{pp['type']}|{pp['direction']}|{pp['label']}|price={pp['price']:.2f}|conf={pp['conf']:.2f}|{pp.get('note','')}")
+    if not pats:
+        lines.append(f"PATTERN|{base}|NONE|neutral|无标准形态|")
     lines.append("")
     lines.append("--- 4h candles (last 42, newest last) ---")
     lines.append("time (CST)        open       high       low        close      chg%    vol z")
