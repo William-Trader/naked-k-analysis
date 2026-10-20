@@ -109,6 +109,14 @@ def init(path: str) -> None:
         ):
             if col not in ocols:
                 conn.execute(ddl)
+        scols = [r[1] for r in conn.execute("PRAGMA table_info(signals)").fetchall()]
+        for col, ddl in (
+            ("setup", "ALTER TABLE signals ADD COLUMN setup TEXT"),
+            ("regime", "ALTER TABLE signals ADD COLUMN regime TEXT"),
+            ("mtf_alignment", "ALTER TABLE signals ADD COLUMN mtf_alignment INTEGER"),
+        ):
+            if col not in scols:
+                conn.execute(ddl)
         conn.commit()
     finally:
         conn.close()
@@ -199,6 +207,39 @@ def fail_alert(path: str, alert_id: int, err: str, max_attempts: int = 5) -> dic
         )
         conn.commit()
         return {"attempts": attempts, "status": status, "next_attempt_at": next_at}
+    finally:
+        conn.close()
+
+
+def add_signal(path: str, rec: dict) -> int:
+    conn = connect(path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO signals (ts, symbol, direction, confidence, entry, stop, target, "
+            "horizon_h, source, setup, regime, mtf_alignment) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (int(rec.get("ts") or _now()), rec.get("symbol"), rec.get("direction"),
+             rec.get("confidence"), rec.get("entry"), rec.get("stop"),
+             rec.get("target"), int(rec.get("horizon_h") or 4), rec.get("source"),
+             rec.get("setup"), rec.get("regime"), rec.get("mtf_alignment")),
+        )
+        conn.commit()
+        return int(cur.lastrowid)
+    finally:
+        conn.close()
+
+
+def add_outcome(path: str, signal_id: int, horizon: int, ts: int, price,
+                ret_pct, hit, mfe=None, mae=None, first_touch=None) -> None:
+    conn = connect(path)
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO outcomes "
+            "(signal_id, horizon_h, ts, price, ret_pct, hit, mfe_pct, mae_pct, first_touch) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (signal_id, horizon, ts, price, ret_pct, hit, mfe, mae, first_touch),
+        )
+        conn.commit()
     finally:
         conn.close()
 

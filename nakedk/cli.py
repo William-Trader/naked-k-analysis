@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 
 from .fetch import summarise
 from .score import evaluate, load_ledger, summarise as score_summarise
@@ -26,13 +27,44 @@ def cmd_fetch(args) -> int:
     return 0
 
 
+def _record_signal(db_path, symbol, s, features):
+    from beagle import store as bstore
+    from .bars import closed_bars
+    from .fetch import klines
+    from .mtf import alignment as mtf_alignment
+    from .patterns import arbitrate, detect as detect_patterns
+    from .structure import structure as structure_of
+    try:
+        ks = closed_bars(klines(symbol, "4h", 200), "4h")
+        arb = arbitrate(detect_patterns(ks, features), features)
+        stc = structure_of(ks)
+        try:
+            mtf = mtf_alignment(symbol)["alignment"]
+        except Exception:
+            mtf = None
+        bstore.init(db_path)
+        return bstore.add_signal(db_path, {
+            "ts": int(time.time() * 1000), "symbol": symbol,
+            "direction": s.get("direction"), "confidence": s.get("confidence"),
+            "entry": s.get("entry"), "stop": s.get("stop"),
+            "target": s.get("target"), "horizon_h": 4, "source": "live",
+            "setup": (arb.get("primary") or {}).get("type"),
+            "regime": stc.get("state"), "mtf_alignment": mtf,
+        })
+    except Exception:
+        return None
+
+
 def cmd_signal(args) -> int:
     rows = []
     for symbol in args.symbols:
         _, features = summarise(symbol)
         s = stance(features)
         line = signal_line(symbol, s)
-        rows.append({"symbol": symbol, **s, "signal": line})
+        rec = {"symbol": symbol, **s, "signal": line}
+        if getattr(args, "record_db", None):
+            rec["record_id"] = _record_signal(args.record_db, symbol, s, features)
+        rows.append(rec)
         if not args.json:
             print(line)
             print("  " + "; ".join(s["reasons"]))
@@ -80,6 +112,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_signal = sub.add_parser("signal", help="emit deterministic SIGNAL lines")
     p_signal.add_argument("symbols", nargs="+")
     p_signal.add_argument("--json", action="store_true")
+    p_signal.add_argument("--record-db", help="record signals into a beagle SQLite DB")
     p_signal.set_defaults(func=cmd_signal)
 
     p_score = sub.add_parser("score", help="score a JSONL signal ledger against real prices")
