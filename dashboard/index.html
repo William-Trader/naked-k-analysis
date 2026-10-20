@@ -127,6 +127,14 @@ function drawChart(cv,s,hover){
   ctx.font='9px ui-monospace,Menlo';
   (sm.highs||[]).forEach(function(m){if(m.i<n){var x=X(m.i),y=Y(m.p);ctx.fillStyle='#ff5b6e';ctx.beginPath();ctx.arc(x,y,2.5,0,6.28);ctx.fill();ctx.fillText('SH',x+3,y-3);}});
   (sm.lows||[]).forEach(function(m){if(m.i<n){var x=X(m.i),y=Y(m.p);ctx.fillStyle='#35d07f';ctx.beginPath();ctx.arc(x,y,2.5,0,6.28);ctx.fill();ctx.fillText('SL',x+3,y+9);}});
+  function trendline(pts,color){
+    if(!pts||pts.length<2)return;
+    var a=pts[pts.length-2],b=pts[pts.length-1];
+    ctx.save();ctx.setLineDash([2,3]);ctx.strokeStyle=color;ctx.beginPath();
+    ctx.moveTo(X(a.i),Y(a.p));ctx.lineTo(X(b.i),Y(b.p));ctx.stroke();ctx.restore();
+  }
+  trendline(sm.highs,'rgba(255,91,110,.45)');
+  trendline(sm.lows,'rgba(53,208,127,.45)');
   if(hover>=0&&hover<n){
     var hx=X(hover);
     ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle='#8b9bb4';ctx.beginPath();
@@ -162,7 +170,7 @@ function card(sym,s){
     +'</div>'
     +'<div class="levels">支撑 <b>'+fmt(s.r20_lo,1)+'</b> / '+fmt((s.swing_lows||[]).slice(-1)[0]||s.low24h,1)+' · 阻力 <b>'+fmt(s.r20_hi,1)+'</b> / '+fmt((s.swing_highs||[]).slice(-1)[0]||s.high24h,1)+'</div>'
     +'<div class="sig">'+sig+'</div>'
-    +'<div style="margin-top:8px;font-size:11px;color:var(--muted)">形态候选：'+pats+'</div>'
+    +'<div style="margin-top:8px;font-size:11px;color:var(--muted)">结构：'+(s.structure||'—')+' · 形态候选：'+pats+'</div>'
     +'<div class="chart-wrap"><canvas class="chart" data-sym="'+sym+'"></canvas><div class="tip"></div></div>'
     +'<div class="legend"><span style="color:#d9b45b">EMA20</span><span style="color:#5aa9ff">EMA50</span><span style="color:var(--up)">涨</span><span style="color:var(--down)">跌</span><span>SH/SL 摆动点</span></div>'
     +'</article>';

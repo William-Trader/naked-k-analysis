@@ -61,6 +61,20 @@ def detect_patterns(ks, f, hs, ls):
     return pats
 
 
+def structure_label(hs, ls):
+    sh = [p for _, p in hs]
+    sl = [p for _, p in ls]
+    hh = len(sh) >= 2 and sh[-1] > sh[-2]
+    hl = len(sl) >= 2 and sl[-1] > sl[-2]
+    lh = len(sh) >= 2 and sh[-1] < sh[-2]
+    ll = len(sl) >= 2 and sl[-1] < sl[-2]
+    if hh and hl:
+        return 'HH/HL 多头结构'
+    if lh and ll:
+        return 'LH/LL 空头结构'
+    return '重叠/区间'
+
+
 def build():
     now = int(time.time() * 1000)
     if _cache["data"] and now - _cache["ts"] < CACHE_TTL * 1000:
@@ -98,6 +112,7 @@ def build():
                 "lows": [{"i": i, "p": p} for i, p in ls],
             },
             "patterns": detect_patterns(k4[-120:], f, hs, ls),
+            "structure": structure_label(hs, ls),
         }
     try:
         conn = sqlite3.connect(DB, timeout=5)
