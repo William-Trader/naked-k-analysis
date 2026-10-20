@@ -29,6 +29,8 @@
 | `05-decision-tree.md` | 9 步决策流程 + 置信度评分 + 硬规则 |
 | `06-output-template.md` | 机器人输出模板 + 示例 |
 | `07-ocr-distilled.md` | 扫描书 OCR 提纯：崔海军/胡云生/许佳聪 |
+| `08-albrooks-deep.md` | Al Brooks 深度框架：周期/Always-In/Setup/概率/管理/12问 |
+| `09-review-rubric.md` | 输出评审标准（12项×5分=60） |
 
 ## 快速开始 / Quickstart
 
