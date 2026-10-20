@@ -12,6 +12,7 @@ DEFAULTS = {
     "quiet_hours": [23, 8],
     "rate_limit_per_hour": 6,
     "rate_limit_per_day": 20,
+    "max_push_attempts": 5,
     "thresholds": {
         "price_shock_atr": 0.8,
         "price_shock_pct": 0.5,
@@ -20,6 +21,7 @@ DEFAULTS = {
         "extreme_pct_1h": 3.0,
         "vol_z": 3.0,
         "breakout_vol_z": 1.0,
+        "min_quality": 40,
     },
 }
 
