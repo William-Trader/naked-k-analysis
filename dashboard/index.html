@@ -79,7 +79,7 @@ function pct(n){ return (n>=0?'+':'')+Number(n).toFixed(2)+'%'; }
 function col(n){ return n>=0?C.up:C.down; }
 function linesKey(sym){ return 'nk-lines-'+sym; }
 function loadLines(sym){ try{return JSON.parse(localStorage.getItem(linesKey(sym))||'[]');}catch(e){return [];} }
-function saveLines(sym,lines){ try{localStorage.setItem(linesKey(sym),JSON.stringify(lines));}catch(e){} }
+function saveLines(sym,lines){ try{localStorage.setItem(linesKey(sym),JSON.stringify(lines));}catch(e){} fetch('/api/drawings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:sym,lines:lines})}).catch(function(){}); }
 function drawChart(sym){
   var st=CH[sym]; if(!st||!st.s||!st.s.candles) return;
   var s=st.s,c=s.candles,n=c.length;
@@ -158,6 +158,7 @@ function drawChart(sym){
   (sm.lows||[]).forEach(function(pt){if(pt.i>=start&&pt.i<end){var x=X(pt.i),y=Y(pt.p);ctx.fillStyle='#35d07f';ctx.beginPath();ctx.arc(x,y,2.4,0,6.28);ctx.fill();ctx.fillText('SL',x+3,y+9);}});
   // patterns
   (s.patterns||[]).forEach(function(pt){
+    if(pt.role==='suppressed') return;
     if(pt.neckline){var y=Y(pt.neckline);ctx.save();ctx.setLineDash([2,4]);ctx.strokeStyle='rgba(217,180,91,.7)';ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+plotW,y);ctx.stroke();ctx.restore();}
     if(pt.index!=null&&pt.index>=start&&pt.index<end){
       var x=X(pt.index),y=Y(pt.price);
@@ -218,7 +219,8 @@ function bind(sym){
     var p=st.plot||{l:8,w:r.width-72};
     var ratio=Math.max(0,Math.min(1,(x-p.l)/p.w));
     st.hover=Math.min(st.s.candles.length-1,st.view.start+Math.floor(ratio*(st.view.end-st.view.start)));
-    st.hoverY=y;drawChart(sym);
+    st.hoverY=y;
+    if(!st.raf){st.raf=true;requestAnimationFrame(function(){st.raf=false;drawChart(sym);});}
   });
   cv.addEventListener('mouseleave',function(){st.hover=-1;st.hoverY=null;drawChart(sym);});
   cv.addEventListener('click',function(e){
@@ -244,7 +246,7 @@ function syncTools(sym){
 function card(sym,s){
   var tr=s.trend||{},st=s.stance||{},dir=st.direction||'neutral';
   var sc=tr.score||50,label=tr.label||'neutral',ai=tr.always_in||'neutral';
-  var pats=(s.patterns||[]).map(function(p){var c=p.direction==='bullish'?'var(--up)':p.direction==='bearish'?'var(--down)':'var(--gold)';return '<span class="pill" style="color:'+c+';border:1px solid '+c+'">'+p.label+(p.conf?' '+Math.round(p.conf*100)+'%':'')+'</span>';}).join(' ')||'<span class="muted" style="font-size:11px">无标准形态</span>';
+  var prim=s.primary_pattern,sec=s.secondary_pattern;var pats='';if(prim){var c=prim.direction==='bullish'?'var(--up)':prim.direction==='bearish'?'var(--down)':'var(--gold)';pats+='<span class="pill" style="color:'+c+';border:1px solid '+c+'">主：'+prim.label+' · '+prim.quality+'</span>';}if(sec){var c2=sec.direction==='bullish'?'var(--up)':sec.direction==='bearish'?'var(--down)':'var(--gold)';pats+='<span class="pill" style="color:'+c2+';border:1px solid '+c2+'">备：'+sec.label+' · '+sec.quality+'</span>';}var sup=(s.patterns||[]).filter(function(x){return x.role==='suppressed';}).length;if(!prim)pats='<span class="muted" style="font-size:11px">无标准形态</span>';pats+='<span class="muted" style="font-size:10px"> · 上下文 '+(s.pattern_context||'—')+' · 过滤 '+sup+' 个</span>';
   var sig='方向 <span class="pill" style="color:'+C[dir]+';border:1px solid '+C[dir]+'">'+dir+'</span> · 置信度 <b>'+(st.confidence||'—')+'</b>';
   if(st.entry)sig+=' · entry <b>'+fmt(st.entry,1)+'</b> · stop <b>'+fmt(st.stop,1)+'</b> · target <b>'+fmt(st.target,1)+'</b>';
   return '<article class="card">'
@@ -272,6 +274,7 @@ function render(){
     var s=DATA.symbols[sym],n=s.candles.length;
     CH[sym]={s:s,view:{start:Math.max(0,n-80),end:n},hover:-1,hoverY:null,mode:'none',p1:null,lines:loadLines(sym)};
     bind(sym);drawChart(sym);
+    fetch('/api/drawings?symbol='+sym).then(function(r){return r.json();}).then(function(lines){if(lines&&lines.length){CH[sym].lines=lines;drawChart(sym);}}).catch(function(){});
     var root=document.querySelector('canvas.chart[data-sym="'+sym+'"]').closest('.card');
     root.querySelectorAll('[data-mode]').forEach(function(b){
       b.addEventListener('click',function(){
@@ -282,7 +285,8 @@ function render(){
     });
     root.querySelector('[data-full]').addEventListener('click',function(){if(root.requestFullscreen)root.requestFullscreen();});
   });
-  document.getElementById('asof').textContent='更新 '+new Date(DATA.as_of).toLocaleString('zh-CN',{hour12:false})+' · '+TF;
+  var first=Object.keys(DATA.symbols||{})[0];var dts=first?DATA.symbols[first].data_ts:DATA.as_of;
+  document.getElementById('asof').textContent='数据 '+new Date(dts).toLocaleString('zh-CN',{hour12:false})+' · Binance · '+TF;
   var ev=document.getElementById('events');
   ev.innerHTML=(DATA.events||[]).map(function(e){
     var t=new Date(e.ts).toLocaleString('zh-CN',{hour12:false});

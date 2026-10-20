@@ -4,19 +4,40 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 from nakedk.fetch import klines, ticker
 from nakedk.features import features_from_klines
-from nakedk.patterns import detect as detect_patterns
+from nakedk.patterns import arbitrate, detect as detect_patterns
 from nakedk.signals import stance
 from nakedk.trend import trend_score
 
 DB = os.environ.get("BEAGLE_DB", "/opt/naked-k-analysis/beagle.db")
+DRAWINGS = os.path.join(os.path.dirname(__file__), "..", "drawings.json")
 CACHE_TTL = 60
 _cache = {}
+_lock = threading.Lock()
+
+
+def load_drawings():
+    try:
+        with open(DRAWINGS, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return {}
+
+
+def save_drawings(symbol, lines):
+    with _lock:
+        data = load_drawings()
+        data[symbol] = lines
+        tmp = DRAWINGS + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False)
+        os.replace(tmp, DRAWINGS)
 VALID = ("1h", "4h", "1d")
 
 
@@ -74,6 +95,7 @@ def build(interval="4h"):
             if candles[i]["l"] == min(x["l"] for x in candles[i - 2:i + 3]):
                 ls.append((i, candles[i]["l"]))
         hs, ls = hs[-8:], ls[-8:]
+        arb = arbitrate(detect_patterns(ks, f), f)
         out["symbols"][sym] = {
             "price": f["price"],
             "change24h": float(t["priceChangePercent"]),
@@ -92,7 +114,12 @@ def build(interval="4h"):
                 "highs": [{"i": i, "p": p} for i, p in hs],
                 "lows": [{"i": i, "p": p} for i, p in ls],
             },
-            "patterns": detect_patterns(ks, f),
+            "data_ts": candles[-1]["t"] if candles else None,
+            "source": "binance",
+            "patterns": arb["patterns"],
+            "primary_pattern": arb["primary"],
+            "secondary_pattern": arb["secondary"],
+            "pattern_context": arb["context"],
             "structure": structure_label(hs, ls),
         }
     try:
@@ -121,6 +148,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         q = parse_qs(urlparse(self.path).query)
+        if urlparse(self.path).path == "/api/drawings":
+            sym = (q.get("symbol") or [""])[0]
+            self._send(json.dumps(load_drawings().get(sym, []), ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8")
+            return
         if urlparse(self.path).path.startswith("/api/overview"):
             interval = (q.get("interval") or ["4h"])[0]
             self._send(json.dumps(build(interval), ensure_ascii=False).encode("utf-8"),
@@ -129,6 +161,22 @@ class Handler(BaseHTTPRequestHandler):
         path = os.path.join(os.path.dirname(__file__), "index.html")
         with open(path, "rb") as fh:
             self._send(fh.read(), "text/html; charset=utf-8")
+
+    def do_POST(self):
+        if urlparse(self.path).path != "/api/drawings":
+            self.send_response(404)
+            self.end_headers()
+            return
+        n = int(self.headers.get("Content-Length", 0))
+        raw = self.rfile.read(n).decode("utf-8")
+        try:
+            body = json.loads(raw)
+            save_drawings(body["symbol"], body.get("lines", []))
+            self._send(b'{"ok":true}', "application/json")
+        except Exception as e:
+            self.send_response(400)
+            self.end_headers()
+            self.wfile.write(str(e).encode("utf-8"))
 
     def log_message(self, *args):
         pass
