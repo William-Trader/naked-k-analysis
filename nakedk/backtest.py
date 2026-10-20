@@ -76,7 +76,7 @@ def _passes_gate(f, s, gate):
 
 
 def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
-              gate=None) -> list:
+              gate=None, tag_setups: bool = False) -> list:
     trades = []
     for i in range(lo, hi):
         window = ks[: i + 1][-200:]
@@ -89,6 +89,14 @@ def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
             continue
         if not _passes_gate(f, s, gate):
             continue
+        setup = None
+        if tag_setups:
+            try:
+                from .patterns import arbitrate, detect as detect_patterns
+                arb = arbitrate(detect_patterns(window, f), f)
+                setup = (arb.get("primary") or {}).get("type")
+            except Exception:
+                setup = None
         entry = float(ks[i][4])
         exit_ = float(ks[i + horizon][4])
         stop, target = s.get("stop"), s.get("target")
@@ -128,8 +136,16 @@ def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
             "confidence": s["confidence"], "gross_ret": round(gross, 3),
             "signed_ret": round(net, 3), "hit": net > 0,
             "hit_stop": hit_stop, "hit_target": hit_target,
+            "setup": setup,
         })
     return trades
+
+
+def _group_by(trades, key):
+    out = {}
+    for t in trades:
+        out.setdefault(t.get(key) or "NONE", []).append(t)
+    return out
 
 
 def _stats(trades: list) -> dict:
@@ -161,16 +177,19 @@ def _stats(trades: list) -> dict:
                       if trades else None),
         "long": sub_stats([t for t in trades if t["direction"] == "long"]),
         "short": sub_stats([t for t in trades if t["direction"] == "short"]),
+        "by_setup": {k: sub_stats(v) for k, v in sorted(
+            _group_by(trades, "setup").items()) if v},
     }
 
 
 def run(symbol: str, days: int = 365, horizon: int = 1, warmup: int = 60,
-        cost_bps: float = DEFAULT_COST_BPS, intrabar: bool = True, gate=None) -> dict:
+        cost_bps: float = DEFAULT_COST_BPS, intrabar: bool = True, gate=None,
+        tag_setups: bool = False) -> dict:
     ks = fetch_history(symbol, "4h", days)
     path_ks = fetch_history(symbol, "1h", days) if intrabar else None
     lo = min(warmup, max(0, len(ks) // 4))
     hi = max(lo, len(ks) - horizon)
-    trades = _simulate(ks, lo, hi, horizon, cost_bps, path_ks, gate)
+    trades = _simulate(ks, lo, hi, horizon, cost_bps, path_ks, gate, tag_setups)
     out = {
         "symbol": symbol, "days": days, "bars": len(ks),
         "cost_bps": cost_bps, "intrabar": intrabar, "gate": gate,
@@ -182,7 +201,7 @@ def run(symbol: str, days: int = 365, horizon: int = 1, warmup: int = 60,
 
 def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
                  warmup: int = 60, cost_bps: float = DEFAULT_COST_BPS,
-                 intrabar: bool = True, gate=None) -> dict:
+                 intrabar: bool = True, gate=None, tag_setups: bool = False) -> dict:
     ks = fetch_history(symbol, "4h", days)
     path_ks = fetch_history(symbol, "1h", days) if intrabar else None
     lo = min(warmup, max(0, len(ks) // 4))
@@ -193,7 +212,7 @@ def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
     for k in range(folds):
         a = lo + span * k // folds
         b = lo + span * (k + 1) // folds
-        trades = _simulate(ks, a, b, horizon, cost_bps, path_ks, gate)
+        trades = _simulate(ks, a, b, horizon, cost_bps, path_ks, gate, tag_setups)
         row = {"fold": k + 1, "bars": b - a}
         row.update(_stats(trades))
         results.append(row)
