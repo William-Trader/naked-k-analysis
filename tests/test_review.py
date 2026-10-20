@@ -11,7 +11,7 @@ class TestReview(unittest.TestCase):
         self.db = os.path.join(self.dir, "b.db")
         self.ad = os.path.join(self.dir, "state", "adaptive.json")
         store.init(self.db)
-        for i in range(40):
+        for i in range(60):
             sid = store.add_signal(self.db, {
                 "ts": 1000 + i, "symbol": "BTCUSDT", "direction": "long",
                 "confidence": 60, "entry": 100, "horizon_h": 1,
@@ -22,8 +22,8 @@ class TestReview(unittest.TestCase):
 
     def test_build_buckets(self):
         rep = review.build(self.db)
-        self.assertEqual(rep["n_total"], 40)
-        self.assertEqual(rep["by_setup"]["L1"]["n"], 40)
+        self.assertEqual(rep["n_total"], 60)
+        self.assertEqual(rep["by_setup"]["L1"]["n"], 60)
         self.assertEqual(rep["by_setup"]["L1"]["hit_rate"], 100.0)
         self.assertTrue(rep["by_setup"]["L1"]["reliable"])
 

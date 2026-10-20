@@ -21,6 +21,7 @@ from nakedk.mtf import alignment as mtf_alignment
 from nakedk.volume import vpoc
 from nakedk.location import atr_distance, edge_zone, session_levels
 from nakedk.signalbar import score as signalbar_score
+from nakedk.regime import arbitrate as arbitrate_regime
 
 DB = os.environ.get("BEAGLE_DB", "/opt/naked-k-analysis/beagle.db")
 DRAWINGS = os.path.join(os.path.dirname(__file__), "..", "drawings.json")
@@ -103,13 +104,9 @@ def build(interval="4h"):
         candles = [{"t": r[0], "o": float(r[1]), "h": float(r[2]),
                     "l": float(r[3]), "c": float(r[4]), "v": float(r[5])}
                    for r in ks]
-        hs, ls = [], []
-        for i in range(2, len(candles) - 2):
-            if candles[i]["h"] == max(x["h"] for x in candles[i - 2:i + 3]):
-                hs.append((i, candles[i]["h"]))
-            if candles[i]["l"] == min(x["l"] for x in candles[i - 2:i + 3]):
-                ls.append((i, candles[i]["l"]))
-        hs, ls = hs[-8:], ls[-8:]
+        marks = f.get("swing_marks") or {}
+        hs = [(m["i"], m["p"]) for m in marks.get("highs", [])]
+        ls = [(m["i"], m["p"]) for m in marks.get("lows", [])]
         arb = arbitrate(detect_patterns(k_closed, f), f)
         try:
             track_patterns(sym, arb["patterns"], PATTERN_DB, f["price"])
@@ -131,7 +128,12 @@ def build(interval="4h"):
         _pdir = ("long" if (arb["primary"] or {}).get("direction") == "bullish"
                  else "short" if (arb["primary"] or {}).get("direction") == "bearish" else None)
         sb = signalbar_score(bar_profile, prev_bar, _pdir, f.get("pos20")) if _pdir else {}
+        reg = arbitrate_regime(struct_v2.get("state"),
+                               (mtf.get("by_state") or {}).get("1d"),
+                               mtf.get("alignment"), f.get("adx14"),
+                               f.get("adx_slope"), f.get("overlap"))
         out["symbols"][sym] = {
+            "regime": reg,
             "price": f["price"],
             "change24h": float(t["priceChangePercent"]),
             "high24h": float(t["highPrice"]),

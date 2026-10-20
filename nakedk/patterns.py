@@ -101,8 +101,11 @@ def _score(p, f, ks, atr):
         q += 10 if (pos < 0.3 or pos > 0.7) else -5
     if p["type"] in TREND:
         q += 5 if 0.3 <= pos <= 0.7 else -10
-    # signal bar quality (last 2 bars)
-    last = ks[-1]
+    # signal bar quality at the pattern's own bar, not today's bar
+    idx = p.get("index")
+    if idx is None or idx < 0 or idx >= len(ks):
+        idx = len(ks) - 1
+    last = ks[idx]
     rng = _f(last[2]) - _f(last[3])
     body = abs(_f(last[4]) - _f(last[1]))
     upper = _f(last[2]) - max(_f(last[1]), _f(last[4]))
@@ -115,8 +118,8 @@ def _score(p, f, ks, atr):
             sb += 3
         if upper < rng * 0.25 or lower < rng * 0.25:
             sb += 2
-        if len(ks) >= 2:
-            prev = ks[-2]
+        if idx >= 1:
+            prev = ks[idx - 1]
             if (_f(last[4]) - _f(last[1])) * (_f(prev[4]) - _f(prev[1])) > 0:
                 sb += 1
     q += sb
@@ -278,9 +281,11 @@ def arbitrate(pats, f):
                         or (mtf <= -2 and x["direction"] == "bullish"))
             aligned = ((mtf >= 2 and x["direction"] == "bullish")
                        or (mtf <= -2 and x["direction"] == "bearish"))
-            if conflict:
-                x["score"] *= 0.55
+            if conflict and x["fit"] >= 0.8:
+                x["score"] *= 0.65
                 x["mtf"] = "conflict"
+            elif conflict:
+                x["mtf"] = "conflict_weak"
             elif aligned:
                 x["score"] *= 1.15
                 x["mtf"] = "aligned"
