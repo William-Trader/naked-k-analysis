@@ -52,8 +52,16 @@ def cmd_score(args) -> int:
 
 
 def cmd_backtest(args) -> int:
-    from .backtest import run
-    rows = [run(symbol, days=args.days, horizon=args.horizon) for symbol in args.symbols]
+    from .backtest import run, walk_forward
+    folds = getattr(args, "folds", 1) or 1
+    rows = []
+    for symbol in args.symbols:
+        if folds > 1:
+            rows.append(walk_forward(symbol, days=args.days, folds=folds,
+                                     horizon=args.horizon, cost_bps=args.cost_bps))
+        else:
+            rows.append(run(symbol, days=args.days, horizon=args.horizon,
+                            cost_bps=args.cost_bps))
     print(json.dumps(rows, ensure_ascii=False, indent=2))
     return 0
 
@@ -82,6 +90,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_bt.add_argument("symbols", nargs="+")
     p_bt.add_argument("--days", type=int, default=365)
     p_bt.add_argument("--horizon", type=int, default=1, help="exit horizon in 4h bars")
+    p_bt.add_argument("--folds", type=int, default=1, help="split into N out-of-sample folds")
+    p_bt.add_argument("--cost-bps", type=float, default=10.0,
+                      help="round-trip fees+slippage in basis points")
     p_bt.set_defaults(func=cmd_backtest)
 
     return parser

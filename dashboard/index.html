@@ -42,7 +42,7 @@ main{max-width:1240px;margin:0 auto;padding:10px 22px 30px}
 .tools button{background:#0a111c;border:1px solid var(--line);color:var(--muted);font-size:11px;padding:5px 9px;border-radius:8px;cursor:pointer}
 .tools button.on{border-color:var(--gold);color:var(--gold)}
 .chart-wrap{position:relative;margin-top:8px}
-canvas.chart{width:100%;height:340px;display:block;cursor:crosshair}
+canvas.chart{width:100%;height:340px;display:block;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}
 .ohlc{position:absolute;left:8px;top:2px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;letter-spacing:.02em}
 .ohlc b{color:var(--text);font-weight:600}
 .hint{font-size:10px;color:var(--muted);margin-top:2px}
@@ -238,6 +238,43 @@ function bind(sym){
       else{st.lines.push({type:'trend',p1:st.p1,p2:{i:idx,price:price}});st.p1=null;saveLines(sym,st.lines);st.mode='none';syncTools(sym);drawChart(sym);}
     }
   });
+  var tch=null;
+  function mid(t){return (t[0].clientX+t[1].clientX)/2;}
+  function tdist(t){var dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.sqrt(dx*dx+dy*dy)||1;}
+  cv.addEventListener('touchstart',function(e){
+    var r=cv.getBoundingClientRect();
+    if(e.touches.length===2){tch={mode:'pinch',d:tdist(e.touches),view:Object.assign({},st.view),x:mid(e.touches)-r.left};e.preventDefault();}
+    else if(e.touches.length===1){tch={mode:'pan',x:e.touches[0].clientX,view:Object.assign({},st.view),moved:0};}
+  },{passive:false});
+  cv.addEventListener('touchmove',function(e){
+    if(!tch)return;e.preventDefault();
+    var r=cv.getBoundingClientRect();
+    if(tch.mode==='pinch'&&e.touches.length===2){
+      var pp=st.plot||{l:8,w:r.width-72};
+      var ratio=tch.d/tdist(e.touches);
+      var cnt=tch.view.end-tch.view.start,newCnt=Math.max(20,Math.min(st.s.candles.length,Math.round(cnt*ratio)));
+      var rr=Math.max(0,Math.min(1,(tch.x-pp.l)/pp.w));
+      var center=tch.view.start+rr*cnt,ns=Math.round(center-rr*newCnt);
+      setView(sym,ns,ns+newCnt);
+      return;
+    }
+    if(tch.mode==='pan'&&e.touches.length===1){
+      var pl=st.plot,d0=(tch.x-e.touches[0].clientX)/pl.w*(tch.view.end-tch.view.start);
+      tch.moved=Math.max(tch.moved,Math.abs(e.touches[0].clientX-tch.x));
+      setView(sym,tch.view.start+Math.round(d0),tch.view.end+Math.round(d0));
+    }
+  },{passive:false});
+  cv.addEventListener('touchend',function(e){
+    if(tch&&tch.mode==='pan'&&tch.moved<8&&e.touches.length===0){
+      var r2=cv.getBoundingClientRect(),x2=tch.x-r2.left;
+      var p2=st.plot||{l:8,w:r2.width-72};
+      var ra=Math.max(0,Math.min(1,(x2-p2.l)/p2.w));
+      st.hover=Math.min(st.s.candles.length-1,st.view.start+Math.floor(ra*(st.view.end-st.view.start)));
+      st.hoverY=null;drawChart(sym);
+    }
+    if(e.touches.length===0){tch=null;}
+    else if(e.touches.length===1&&tch){tch={mode:'pan',x:e.touches[0].clientX,view:Object.assign({},st.view),moved:0};}
+  },{passive:false});
   cv.addEventListener('dblclick',function(){var card=cv.closest('.card');if(card&&card.requestFullscreen)card.requestFullscreen();});
 }
 function syncTools(sym){

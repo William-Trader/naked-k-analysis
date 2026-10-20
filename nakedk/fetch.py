@@ -17,6 +17,8 @@ from .features import features_from_klines
 from .trend import trend_score
 from .patterns import arbitrate, detect as detect_patterns
 from .pattern_tracker import states as pattern_states, track as track_patterns
+from .derivs import derivatives
+from .calibration import table_from_db
 
 BASE = "https://data-api.binance.vision"
 CST = timezone(timedelta(hours=8))
@@ -79,6 +81,20 @@ def summarise(symbol: str) -> tuple[str, dict]:
     lines.append(
         f"returns: 4h {f['ret4h']:+.2f}% | 24h {f['ret24h']:+.2f}% | 72h {f['ret72h']:+.2f}%"
     )
+    try:
+        dv = derivatives(symbol)
+    except Exception:
+        dv = {}
+    for k, v in dv.items():
+        if v is not None:
+            f[k] = v
+    if any(v is not None for v in dv.values()):
+        rate = dv.get("funding_rate")
+        lines.append(
+            f"FUNDING|{base}|rate={fmt(rate * 100, 4) if rate is not None else 'NA'}%"
+            f"|oi={fmt(dv.get('open_interest'), 0) if dv.get('open_interest') is not None else 'NA'}"
+            f"|oi_chg_24h={fmt(dv.get('oi_change_24h'), 2) if dv.get('oi_change_24h') is not None else 'NA'}%"
+        )
     lines.append("SIG|" + "|".join(
         f"{k}={v:.2f}" if isinstance(v, float) else f"{k}={v}"
         for k, v in [
@@ -93,6 +109,16 @@ def summarise(symbol: str) -> tuple[str, dict]:
     ts = trend_score(f)
     lines.append(f"TREND|{base}|score={ts['score']}|label={ts['label']}|always_in={ts['always_in']}|ema={ts['components']['ema']}|adx={ts['components']['adx']}|pos={ts['components']['pos']}|mom={ts['components']['mom']}")
     lines.append(f"trend: {ts['score']}/100 ({ts['label']}, Always-In={ts['always_in']})")
+    try:
+        cdb = os.environ.get("NK_CALIB_DB") or os.path.join(os.path.dirname(__file__), "..", "beagle.db")
+        tbl = table_from_db(cdb)
+        if tbl.get("n"):
+            parts = " ".join(
+                f"{k}:{v['p'] * 100:.0f}%(n={v['n']})" for k, v in tbl["buckets"].items()
+            )
+            lines.append(f"CALIB|{base}|n={tbl['n']}|base={tbl['base_rate']}%|{parts}")
+    except Exception:
+        pass
     arb = arbitrate(detect_patterns(k4, f), f)
     prim = arb["primary"] or {}
     sec = arb["secondary"] or {}
