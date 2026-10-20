@@ -52,5 +52,42 @@
     "n": 16,
     "up_4h": 38,
     "up_24h": 62
+  },
+  "walkforward_730d": {
+    "BTCUSDT": {
+      "trades": 810,
+      "hit_rate": 49.6,
+      "avg_ret": -0.01,
+      "cum_return": -10.82,
+      "max_drawdown": -26.85
+    },
+    "ETHUSDT": {
+      "trades": 775,
+      "hit_rate": 48.8,
+      "avg_ret": -0.078,
+      "cum_return": -49.67,
+      "max_drawdown": -58.67
+    },
+    "SOLUSDT": {
+      "trades": 831,
+      "hit_rate": 47.4,
+      "avg_ret": -0.135,
+      "cum_return": -70.82,
+      "max_drawdown": -73.11
+    },
+    "BNBUSDT": {
+      "trades": 906,
+      "hit_rate": 49.0,
+      "avg_ret": -0.022,
+      "cum_return": -22.44,
+      "max_drawdown": -32.85
+    },
+    "XRPUSDT": {
+      "trades": 1059,
+      "hit_rate": 48.6,
+      "avg_ret": -0.059,
+      "cum_return": -53.86,
+      "max_drawdown": -74.1
+    }
   }
 }
