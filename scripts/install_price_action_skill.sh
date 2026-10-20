@@ -17,7 +17,7 @@ if [ -f "$AG" ] && ! grep -q "price-action-analyst" "$AG"; then
   {
     echo ""
     echo "## 价格行为系统"
-    echo "- 处理任何行情/价格行为请求前，先读 skill `price-action-analyst`。"
+    echo "- 处理任何行情/价格行为请求前，先读 skill price-action-analyst。"
     echo "- 数据入口：python3 $APP_DIR/pa_fetch.py BTCUSDT ETHUSDT"
     echo "- 输出必须遵循一屏九行结构 + 结尾 SIGNAL 两行。"
   } >> "$AG"
