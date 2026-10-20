@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-10-20",
+  "sample": {
+    "briefings": 201,
+    "from": "2026-09-13",
+    "to": "2026-10-20",
+    "symbol": "BTCUSDT",
+    "interval": "4h"
+  },
+  "btc": {
+    "base_up_rate": {
+      "4h": 54.2,
+      "8h": 54.2,
+      "12h": 52.7,
+      "24h": 55.2,
+      "48h": 49.8
+    },
+    "long_hit": {
+      "4h": 56,
+      "8h": 48,
+      "12h": 41,
+      "24h": 37,
+      "48h": 44
+    },
+    "short_hit": {
+      "4h": 66,
+      "8h": 43,
+      "12h": 69,
+      "24h": 43,
+      "48h": 43
+    },
+    "directional_hit": {
+      "4h": 61,
+      "8h": 45,
+      "12h": 56,
+      "24h": 40,
+      "48h": 44
+    }
+  },
+  "stance_distribution": {
+    "neutral": 139,
+    "short": 35,
+    "long": 27
+  },
+  "regime_distribution": {
+    "mixed": 142,
+    "range": 55,
+    "trend": 4
+  },
+  "fabricated_probability_briefings": 200,
+  "short_at_range_low": {
+    "n": 16,
+    "up_4h": 38,
+    "up_24h": 62
+  }
+}
