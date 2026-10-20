@@ -22,6 +22,17 @@ def load_rows(db_path: str) -> list:
         conn.close()
 
 
+def _count_signals(db_path: str) -> int:
+    conn = store.connect(db_path)
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM signals WHERE direction IN ('long', 'short')"
+        ).fetchone()
+        return int(row[0]) if row else 0
+    finally:
+        conn.close()
+
+
 def _mtf_key(r):
     a = r.get("mtf_alignment")
     if a is None:
@@ -40,6 +51,7 @@ def build(db_path: str, adaptive_path: str | None = None, apply: bool = False) -
     report = {
         "generated_at": int(time.time() * 1000),
         "n_total": len(rows),
+        "n_pending": max(0, _count_signals(db_path) - len(rows)),
         "n_live": len(live),
         "base": base,
         "by_setup": bucket(rows, lambda r: r.get("setup") or "NONE"),
