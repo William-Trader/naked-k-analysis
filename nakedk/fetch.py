@@ -9,12 +9,14 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from urllib.request import Request, urlopen
 
 from .features import features_from_klines
 from .trend import trend_score
 from .patterns import arbitrate, detect as detect_patterns
+from .pattern_tracker import states as pattern_states, track as track_patterns
 
 BASE = "https://data-api.binance.vision"
 CST = timezone(timedelta(hours=8))
@@ -99,6 +101,13 @@ def summarise(symbol: str) -> tuple[str, dict]:
         lines.append(f"PATTERN|{base}|{pp['type']}|{pp['direction']}|{pp['label']}|price={pp['price']:.2f}|quality={pp['quality']}|score={pp['score']}|role={pp['role']}|rr={pp.get('rr','')}|{pp.get('note','')}")
     if not arb["patterns"]:
         lines.append(f"PATTERN|{base}|NONE|neutral|无标准形态|")
+    try:
+        pdb = os.environ.get("NK_PATTERN_DB") or os.path.join(os.path.dirname(__file__), "..", "patterns.db")
+        track_patterns(symbol, arb["patterns"], pdb, f.get("price"))
+        for stt in pattern_states(symbol, pdb, 6):
+            lines.append(f"PATTERN_STATE|{base}|{stt['type']}|{stt['direction']}|{stt['status']}|quality={stt['quality']}")
+    except Exception:
+        pass
     lines.append("")
     lines.append("--- 4h candles (last 42, newest last) ---")
     lines.append("time (CST)        open       high       low        close      chg%    vol z")
