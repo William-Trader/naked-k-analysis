@@ -48,6 +48,18 @@ naked-k-analysis 是一个**零依赖的价格行为（裸K）分析与多频监
 - **OpenClaw 技能对接**：`skills/price-action-analyst` + 幂等安装脚本，机器人按同一套数据与规则说话。
 - **工程化**：零依赖、110 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署。
 
+### 趋势概率与形态共振
+
+- `PROB`：按 `regime | ADX 档 | 位置档` 统计历史下一根 4h 的涨/跌/平分布；样本 <100 自动合并到 regime 池，仍不足只输出 `status=insufficient`，不给假精确百分比。
+- `PATTERN_MTF`：1d 形态与 4h 触发的一致性判断（same / conflict），对主形态做 ±8%/级的有界加权（最多 ±24%）。
+- 前端性能：gzip（页面 24KB → 约 8KB）、页面隐藏时暂停轮询、事件流节点上限 30。
+
+### 回测结论（如实）
+
+- 18 组参数 × 2 标的 × 8 折、含 1h 盘中路径与 12bp 成本：**0 组平均收益为正**。
+- 最好一组 stop 1.5 / target 2.0 / ADX 22：平均 −0.034%，t = −0.66。
+- 因此方向输出保留为**描述性判断**，不作为入场依据；详见 `docs/OPTIMIZE.md`。
+
 ### QQ 推送消息
 
 推送不是把指标念一遍，而是三句话能照做：发生了什么、现在怎么做、哪里算错。
