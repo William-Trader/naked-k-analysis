@@ -105,7 +105,7 @@ def cmd_backtest(args) -> int:
 def cmd_optimize(args) -> int:
     from .backtest import optimize
     rows = optimize(args.symbols, days=args.days, folds=args.folds,
-                    cost_bps=args.cost_bps)
+                    cost_bps=args.cost_bps, log_path=args.log)
     print(json.dumps(rows[:12], ensure_ascii=False, indent=2))
     return 0
 
@@ -151,6 +151,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_opt.add_argument("--days", type=int, default=240)
     p_opt.add_argument("--folds", type=int, default=6)
     p_opt.add_argument("--cost-bps", type=float, default=12.0)
+    p_opt.add_argument("--log", help="append one JSON line per config")
     p_opt.set_defaults(func=cmd_optimize)
 
     return parser

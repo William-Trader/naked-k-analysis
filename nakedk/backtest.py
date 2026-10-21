@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 import time
 
+import json
+
 from .features import features_from_klines
 from .fetch import get_json
 from .signals import stance
@@ -76,14 +78,19 @@ def _passes_gate(f, s, gate):
 
 
 def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
-              gate=None, tag_setups: bool = False, params=None) -> list:
+              gate=None, tag_setups: bool = False, params=None, feats=None) -> list:
     trades = []
     for i in range(lo, hi):
         window = ks[: i + 1][-200:]
-        try:
-            f = features_from_klines(window)
-        except ValueError:
-            continue
+        if feats is not None:
+            f = feats.get(i)
+            if not f:
+                continue
+        else:
+            try:
+                f = features_from_klines(window)
+            except ValueError:
+                continue
         s = stance(f)
         if s["direction"] not in ("long", "short"):
             continue
@@ -166,26 +173,39 @@ DEFAULT_GRID = [{"stop_atr": s, "target_atr": t, "adx_min": a}
                 for a in (18, 20, 22)]
 
 
+def _precompute(ks, lo: int, hi: int) -> dict:
+    out = {}
+    for i in range(lo, hi):
+        try:
+            out[i] = features_from_klines(ks[: i + 1][-200:])
+        except ValueError:
+            continue
+    return out
+
+
 def optimize(symbols, days: int = 365, folds: int = 8,
              cost_bps: float = DEFAULT_COST_BPS, grid=None,
-             horizon: int = 1) -> list:
-    """Walk-forward parameter search; ranks by fold consistency, not best fold."""
+             horizon: int = 1, log_path: str = None) -> list:
+    """Walk-forward parameter search with cached features and incremental log."""
     grid = grid or DEFAULT_GRID
-    data = {s: (fetch_history(s, "4h", days), fetch_history(s, "1h", days))
-            for s in symbols}
+    data = {}
+    for s in symbols:
+        ks = fetch_history(s, "4h", days)
+        path_ks = fetch_history(s, "1h", days)
+        lo = min(60, max(0, len(ks) // 4))
+        hi = max(lo, len(ks) - horizon)
+        data[s] = (ks, path_ks, lo, hi, _precompute(ks, lo, hi))
     out = []
     for params in grid:
         rows = []
-        for sym, (ks, path_ks) in data.items():
-            lo = min(60, max(0, len(ks) // 4))
-            hi = max(lo, len(ks) - horizon)
+        for sym, (ks, path_ks, lo, hi, feats) in data.items():
             span = hi - lo
             nf = max(2, min(int(folds), 12))
             for k in range(nf):
                 a = lo + span * k // nf
                 b = lo + span * (k + 1) // nf
                 trades = _simulate(ks, a, b, horizon, cost_bps, path_ks,
-                                   None, False, params)
+                                   None, False, params, feats)
                 rows.append(_stats(trades))
         hits = [r["hit_rate"] for r in rows if r["hit_rate"] is not None]
         avgs = [r["avg_ret"] for r in rows if r["avg_ret"] is not None]
@@ -194,14 +214,21 @@ def optimize(symbols, days: int = 365, folds: int = 8,
               if avgs and len(avgs) > 1 else 0.0)
         t_stat = (mean_avg / (sd / len(avgs) ** 0.5)) if sd and avgs else 0.0
         positive = sum(1 for x in avgs if x > 0)
-        out.append({
+        row = {
             "params": params,
             "mean_hit": round(sum(hits) / len(hits), 1) if hits else None,
             "mean_avg": round(mean_avg, 3) if mean_avg is not None else None,
             "positive_folds": positive,
             "total_folds": len(avgs),
             "t_stat": round(t_stat, 2),
-        })
+        }
+        out.append(row)
+        if log_path:
+            try:
+                with open(log_path, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
     out.sort(key=lambda r: (r["positive_folds"], r["mean_avg"] or -9), reverse=True)
     return out
 
