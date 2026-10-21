@@ -80,7 +80,16 @@ python3 -m beagle review --config config/beagle.json --apply
 python3 -m beagle push --config config/beagle.json --send
 ```
 
-## 5. 已知坑
+## 5. 知识库（必读）
+
+- `knowledge/10-albrooks-taxonomy.md`：术语全集 + 引擎映射（遇到不认识的术语先查这里，不要自造）
+- `knowledge/08-albrooks-deep.md`：12 问检查表
+- `knowledge/05-decision-tree.md`：决策顺序
+- `knowledge/09-review-rubric.md`：评审标准
+
+形态必须写明 stage（forming / breakout / target / failed）；未突破只能写「形成中」。
+
+## 6. 已知坑
 
 - `openclaw` 不在 systemd PATH：push 已用 `cli_path()` 兜底；手工执行仍建议 `export PATH=$HOME/.npm-global/bin:$PATH`。
 - `.beagle.env` 权限必须是 600，且 `BEAGLE_QQ_TARGET` 不能带引号包裹空格。
