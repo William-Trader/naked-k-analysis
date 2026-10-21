@@ -102,6 +102,14 @@ def cmd_backtest(args) -> int:
     return 0
 
 
+def cmd_optimize(args) -> int:
+    from .backtest import optimize
+    rows = optimize(args.symbols, days=args.days, folds=args.folds,
+                    cost_bps=args.cost_bps)
+    print(json.dumps(rows[:12], ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="nakedk",
@@ -137,6 +145,13 @@ def build_parser() -> argparse.ArgumentParser:
     p_bt.add_argument("--gate", choices=["none", "quality", "quality_soft"], default="none",
                       help="extra entry gate for iteration")
     p_bt.set_defaults(func=cmd_backtest)
+
+    p_opt = sub.add_parser("optimize", help="walk-forward parameter search")
+    p_opt.add_argument("symbols", nargs="+")
+    p_opt.add_argument("--days", type=int, default=240)
+    p_opt.add_argument("--folds", type=int, default=6)
+    p_opt.add_argument("--cost-bps", type=float, default=12.0)
+    p_opt.set_defaults(func=cmd_optimize)
 
     return parser
 
