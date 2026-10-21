@@ -31,7 +31,16 @@ def bucket(f):
     return regime + "|" + a + "|" + p
 
 
-def build(ks, horizon: int = 1, warmup: int = 60, lookback: int = 300):
+def bucket_regime(f):
+    if f["ema20"] > f["ema50"] and f["price"] > f["ema20"]:
+        return "up"
+    if f["ema20"] < f["ema50"] and f["price"] < f["ema20"]:
+        return "down"
+    return "range"
+
+
+def build(ks, horizon: int = 1, warmup: int = 60, lookback: int = 300,
+          mode: str = "full"):
     table = {}
     start = max(warmup, len(ks) - lookback)
     for i in range(start, len(ks) - horizon):
@@ -41,7 +50,7 @@ def build(ks, horizon: int = 1, warmup: int = 60, lookback: int = 300):
             continue
         if not f.get("adx14"):
             continue
-        key = bucket(f)
+        key = bucket(f) if mode == "full" else bucket_regime(f)
         raw = (float(ks[i + horizon][4]) / float(ks[i][4]) - 1.0) * 100.0
         d = "up" if raw > 0.1 else ("down" if raw < -0.1 else "flat")
         row = table.setdefault(key, {"n": 0, "up": 0, "down": 0, "flat": 0})

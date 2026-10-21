@@ -28,6 +28,7 @@ from .flow import analyse as flow_analyse, classify as flow_classify
 from .regime import arbitrate as arbitrate_regime
 from .pattern_mtf import confluence as mtf_confluence, apply as apply_confluence
 from .analogs import build as analogs_build, bucket as analogs_bucket
+from .analogs import bucket_regime as analogs_regime
 from .events import failed_break, follow_through
 from .micro import analyse as micro_analyse
 from .volstruct import analyse as volstruct_analyse
@@ -311,13 +312,23 @@ def summarise(symbol: str) -> tuple[str, dict]:
         except Exception:
             pass
         try:
-            table = analogs_build(k4, horizon=1)
-            row = table.get(analogs_bucket(f))
-            if row:
+            key = analogs_bucket(f)
+            row = analogs_build(k4, horizon=1).get(key)
+            source = "full"
+            if not row or row["n"] < 100:
+                pkey = analogs_regime(f)
+                row = analogs_build(k4, horizon=1, mode="regime").get(pkey)
+                key, source = pkey, "pooled"
+            if row and row["n"] >= 100:
                 lines.append(
-                    f"PROB|{base}|bucket={analogs_bucket(f)}|n={row['n']}"
+                    f"PROB|{base}|bucket={key}|n={row['n']}|source={source}"
                     f"|up={row['p_up']}|down={row['p_down']}|flat={row['p_flat']}"
                     f"|wilson_up={row['wilson_up'][0]}-{row['wilson_up'][1]}"
+                )
+            else:
+                lines.append(
+                    f"PROB|{base}|bucket={key}|n={row['n'] if row else 0}"
+                    f"|status=insufficient"
                 )
         except Exception:
             pass
