@@ -26,6 +26,8 @@ from .volume import vpoc, effort_result, divergence
 from .location import atr_distance, edge_zone, session_levels, plan_from_context
 from .flow import analyse as flow_analyse, classify as flow_classify
 from .regime import arbitrate as arbitrate_regime
+from .pattern_mtf import confluence as mtf_confluence, apply as apply_confluence
+from .analogs import build as analogs_build, bucket as analogs_bucket
 from .events import failed_break, follow_through
 from .micro import analyse as micro_analyse
 from .volstruct import analyse as volstruct_analyse
@@ -292,6 +294,30 @@ def summarise(symbol: str) -> tuple[str, dict]:
                     f"CROSS|{base}|corr30={cr.get('corr_30d')}|btc30={cr.get('btc_30d')}"
                     f"|eth30={cr.get('eth_30d')}|rs={cr.get('relative_strength')}"
                     f"|ethbtc={cr.get('ethbtc_trend', 'NA')}"
+                )
+        except Exception:
+            pass
+        try:
+            d1_ks = closed_bars(klines(symbol, "1d", 160), "1d")
+            d1_f = features_from_klines(d1_ks)
+            d1_arb = arbitrate(detect_patterns(d1_ks, d1_f), d1_f)
+            conf = mtf_confluence(prim, d1_arb.get("primary"), reg.get("regime"))
+            apply_confluence(prim, conf)
+            lines.append(
+                f"PATTERN_MTF|{base}|h4={prim.get('type', 'NONE')}"
+                f"|d1={(d1_arb.get('primary') or {}).get('type', 'NONE')}"
+                f"|align={conf['align']}|score={conf['score']}"
+            )
+        except Exception:
+            pass
+        try:
+            table = analogs_build(k4, horizon=1)
+            row = table.get(analogs_bucket(f))
+            if row:
+                lines.append(
+                    f"PROB|{base}|bucket={analogs_bucket(f)}|n={row['n']}"
+                    f"|up={row['p_up']}|down={row['p_down']}|flat={row['p_flat']}"
+                    f"|wilson_up={row['wilson_up'][0]}-{row['wilson_up'][1]}"
                 )
         except Exception:
             pass

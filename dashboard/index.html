@@ -342,7 +342,7 @@ function render(){
   var first=Object.keys(DATA.symbols||{})[0];var dts=first?DATA.symbols[first].data_ts:DATA.as_of;
   document.getElementById('asof').textContent='数据 '+new Date(dts).toLocaleString('zh-CN',{hour12:false})+' · Binance · '+TF;
   var ev=document.getElementById('events');
-  ev.innerHTML=(DATA.events||[]).map(function(e){
+  ev.innerHTML=(DATA.events||[]).slice(0,30).map(function(e){
     var t=new Date(e.ts).toLocaleString('zh-CN',{hour12:false});
     var c=e.severity==='P0'?'var(--up)':e.severity==='P1'?'var(--amber)':'var(--muted)';
     return '<div class="ev"><span class="sev" style="color:'+c+'">'+e.severity+'</span><span class="t">'+t+'</span><span>'+e.symbol+' · '+e.kind+'</span><span class="muted">'+fmt(e.price,1)+'</span></div>';
@@ -355,7 +355,9 @@ async function load(tf){
 }
 window.addEventListener('resize',function(){Object.keys(CH).forEach(function(k){drawChart(k);});});
 document.querySelectorAll('#tf button').forEach(function(b){b.addEventListener('click',function(){load(b.getAttribute('data-tf'));});});
-load('4h');setInterval(function(){load(TF);},60000);
+load('4h');
+setInterval(function(){ if(!document.hidden) load(TF); },60000);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) load(TF); });
 </script>
 </body>
 </html>
