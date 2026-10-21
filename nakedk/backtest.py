@@ -76,7 +76,7 @@ def _passes_gate(f, s, gate):
 
 
 def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
-              gate=None, tag_setups: bool = False) -> list:
+              gate=None, tag_setups: bool = False, params=None) -> list:
     trades = []
     for i in range(lo, hi):
         window = ks[: i + 1][-200:]
@@ -89,6 +89,18 @@ def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
             continue
         if not _passes_gate(f, s, gate):
             continue
+        entry = float(ks[i][4])
+        if params:
+            atr = f.get("atr14") or 0.0
+            if (f.get("adx14") or 0.0) < params.get("adx_min", 0):
+                continue
+            if atr:
+                if s["direction"] == "long":
+                    s["stop"] = entry - params.get("stop_atr", 1.5) * atr
+                    s["target"] = entry + params.get("target_atr", 3.0) * atr
+                else:
+                    s["stop"] = entry + params.get("stop_atr", 1.5) * atr
+                    s["target"] = entry - params.get("target_atr", 3.0) * atr
         setup = None
         if tag_setups:
             try:
@@ -148,6 +160,52 @@ def _group_by(trades, key):
     return out
 
 
+DEFAULT_GRID = [{"stop_atr": s, "target_atr": t, "adx_min": a}
+                for s in (1.0, 1.5, 2.0)
+                for t in (2.0, 3.0, 4.0)
+                for a in (18, 20, 22)]
+
+
+def optimize(symbols, days: int = 365, folds: int = 8,
+             cost_bps: float = DEFAULT_COST_BPS, grid=None,
+             horizon: int = 1) -> list:
+    """Walk-forward parameter search; ranks by fold consistency, not best fold."""
+    grid = grid or DEFAULT_GRID
+    data = {s: (fetch_history(s, "4h", days), fetch_history(s, "1h", days))
+            for s in symbols}
+    out = []
+    for params in grid:
+        rows = []
+        for sym, (ks, path_ks) in data.items():
+            lo = min(60, max(0, len(ks) // 4))
+            hi = max(lo, len(ks) - horizon)
+            span = hi - lo
+            nf = max(2, min(int(folds), 12))
+            for k in range(nf):
+                a = lo + span * k // nf
+                b = lo + span * (k + 1) // nf
+                trades = _simulate(ks, a, b, horizon, cost_bps, path_ks,
+                                   None, False, params)
+                rows.append(_stats(trades))
+        hits = [r["hit_rate"] for r in rows if r["hit_rate"] is not None]
+        avgs = [r["avg_ret"] for r in rows if r["avg_ret"] is not None]
+        mean_avg = sum(avgs) / len(avgs) if avgs else None
+        sd = ((sum((x - mean_avg) ** 2 for x in avgs) / len(avgs)) ** 0.5
+              if avgs and len(avgs) > 1 else 0.0)
+        t_stat = (mean_avg / (sd / len(avgs) ** 0.5)) if sd and avgs else 0.0
+        positive = sum(1 for x in avgs if x > 0)
+        out.append({
+            "params": params,
+            "mean_hit": round(sum(hits) / len(hits), 1) if hits else None,
+            "mean_avg": round(mean_avg, 3) if mean_avg is not None else None,
+            "positive_folds": positive,
+            "total_folds": len(avgs),
+            "t_stat": round(t_stat, 2),
+        })
+    out.sort(key=lambda r: (r["positive_folds"], r["mean_avg"] or -9), reverse=True)
+    return out
+
+
 def _stats(trades: list) -> dict:
     equity, value = [], 1.0
     for t in trades:
@@ -201,7 +259,8 @@ def run(symbol: str, days: int = 365, horizon: int = 1, warmup: int = 60,
 
 def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
                  warmup: int = 60, cost_bps: float = DEFAULT_COST_BPS,
-                 intrabar: bool = True, gate=None, tag_setups: bool = False) -> dict:
+                 intrabar: bool = True, gate=None, tag_setups: bool = False,
+                 params=None) -> dict:
     ks = fetch_history(symbol, "4h", days)
     path_ks = fetch_history(symbol, "1h", days) if intrabar else None
     lo = min(warmup, max(0, len(ks) // 4))
@@ -212,7 +271,8 @@ def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
     for k in range(folds):
         a = lo + span * k // folds
         b = lo + span * (k + 1) // folds
-        trades = _simulate(ks, a, b, horizon, cost_bps, path_ks, gate, tag_setups)
+        trades = _simulate(ks, a, b, horizon, cost_bps, path_ks, gate,
+                           tag_setups, params)
         row = {"fold": k + 1, "bars": b - a}
         row.update(_stats(trades))
         results.append(row)
