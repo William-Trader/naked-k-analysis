@@ -26,6 +26,7 @@ from .volume import vpoc, effort_result, divergence
 from .location import atr_distance, edge_zone, session_levels, plan_from_context
 from .flow import analyse as flow_analyse, classify as flow_classify
 from .regime import arbitrate as arbitrate_regime
+from .policy import allow as policy_allow, note as policy_note
 from .pattern_mtf import confluence as mtf_confluence, apply as apply_confluence
 from .analogs import build as analogs_build, bucket as analogs_bucket
 from .analogs import bucket_regime as analogs_regime
@@ -226,6 +227,15 @@ def summarise(symbol: str) -> tuple[str, dict]:
             f"MTF|{base}|d1={mtf['by_tf']['1d']:+d}|h4={mtf['by_tf']['4h']:+d}"
             f"|h1={mtf['by_tf']['1h']:+d}|alignment={mtf['alignment']:+d}|label={mtf['label']}"
         )
+        pdir0 = ("long" if prim.get("direction") == "bullish"
+                 else "short" if prim.get("direction") == "bearish" else None)
+        if pdir0:
+            pstate = stc.get("state")
+            lines.append(
+                f"POLICY|{base}|regime={pstate}|dir={pdir0}"
+                f"|action={'allow' if policy_allow(pstate, pdir0) else 'block'}"
+                f"|basis={policy_note(pstate, pdir0)}"
+            )
         reg = arbitrate_regime(stc.get("state"), (mtf.get("by_state") or {}).get("1d"),
                                mtf.get("alignment"), f.get("adx14"),
                                f.get("adx_slope"), f.get("overlap"))
