@@ -106,6 +106,15 @@ def cmd_record(args):
                 mtf = mtf_alignment(symbol)["alignment"]
             except Exception:
                 mtf = None
+            try:
+                from nakedk.policy import allow as policy_allow
+                if not policy_allow(stc.get("state"), s["direction"]):
+                    out.append({"symbol": symbol, "status": "policy_block",
+                                "regime": stc.get("state"),
+                                "direction": s["direction"]})
+                    continue
+            except Exception:
+                pass
             candidates.append({
                 "symbol": symbol, "ts": bar_ts, "direction": s["direction"],
                 "confidence": s.get("confidence"),
