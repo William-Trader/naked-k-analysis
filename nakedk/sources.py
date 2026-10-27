@@ -15,7 +15,7 @@ import urllib.request
 from urllib.request import Request, urlopen
 
 UA = {"User-Agent": "naked-k-analysis/2.0"}
-PROXY = os.environ.get("NK_PROXY") or "http://127.0.0.1:17890"
+PROXY = os.environ.get("NK_PROXY") or "http://127.0.0.1:7890"
 BLOCK_TTL = 1800
 _CACHE_FILE = os.environ.get("NK_BLOCK_FILE") or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "state", "blocked_sources.json")
