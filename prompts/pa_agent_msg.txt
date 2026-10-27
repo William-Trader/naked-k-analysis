@@ -18,6 +18,9 @@
 
 硬性规则：
 - 必须引用 BAR / STRUCT / MTF / LOC / VOLP / SIGBAR / FLOW / TRADES / BOOK / MICRO / VOLS / CROSS / PLAN 中至少 5 行。
+- 必须读取 MULTI（多源加权）：所有价位以 weighted 为准，不得只取单一交易所。
+- 若 n<3 或 dev>0.5%：数据行必须标“多源不一致”，置信度上限 55；n<2 时只写观察、不给方向。
+- 数据行统一写：数据：N源加权 · 偏差X% · Binance 4h · 时间 · 非投资建议。
 - FLOW 与 TRADES 冲突时以逐笔 TRADES 为准；BOOK 买盘失衡 > +0.3 时不得追空，< -0.3 时不得追多。
 - 方向必须与 MTF alignment 一致：alignment ≥ +2 不得做空，≤ −2 不得做多；冲突时写中性。
 - 信号K score < 40 → 不得给方向；SIGBAR 的 missing 项必须写出来。

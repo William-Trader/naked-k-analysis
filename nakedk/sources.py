@@ -1,9 +1,11 @@
-"""Multi-exchange free-source price aggregation, weighted by 24h quote volume.
+"""Multi-exchange price aggregation with robust, liquidity-weighted estimation.
 
-Reachability on the production host (2026-10-27):
-  binance, gate  -> direct
-  okx, kucoin, bitget -> via W1 mihomo tunnel at 127.0.0.1:17890
-  bybit -> 403 even through the proxy (regional block); kept but skipped fast
+Weight design:
+  w_i = liquidity_share_i * quality_i
+  quality: 1.0 within 0.3% of median, 0.25 within 1%, 0 beyond 1%
+  cap: no single source above 60% of total weight (redistribute twice)
+Outputs: weighted price, median, max deviation, effective source count,
+confidence label and per-source weights — all auditable.
 """
 from __future__ import annotations
 
@@ -17,6 +19,9 @@ from urllib.request import Request, urlopen
 UA = {"User-Agent": "naked-k-analysis/2.0"}
 PROXY = os.environ.get("NK_PROXY") or "http://127.0.0.1:7890"
 BLOCK_TTL = 1800
+MAX_SHARE = 0.60
+DEV_BAND = 0.003
+HARD_DEV = 0.010
 _CACHE_FILE = os.environ.get("NK_BLOCK_FILE") or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", "state", "blocked_sources.json")
 
@@ -101,19 +106,85 @@ def _bitget(symbol: str) -> dict:
             "quote_vol": float(row.get("quoteVolume") or row.get("usdtVolume") or 0.0)}
 
 
-def _bybit(symbol: str) -> dict:
-    d = _get(f"https://api.bybit.com/v5/market/tickers?category=spot&symbol={symbol}",
-             timeout=3, proxy=True)
-    row = d["result"]["list"][0]
-    return {"source": "bybit", "price": float(row["lastPrice"]),
-            "quote_vol": float(row.get("turnover24h") or 0.0)}
-
-
 SOURCES = (_binance, _gate, _okx, _kucoin, _bitget)
 
 
+def _median(xs):
+    s = sorted(xs)
+    n = len(s)
+    if not n:
+        return 0.0
+    return s[n // 2] if n % 2 else (s[n // 2 - 1] + s[n // 2]) / 2.0
+
+
+def combine(rows, max_share: float = MAX_SHARE) -> dict:
+    """Pure weighting step: no IO, fully testable."""
+    rows = [dict(r) for r in rows if r.get("price") and r["price"] > 0]
+    if not rows:
+        return {}
+    total_vol = sum(float(r.get("quote_vol") or 0.0) for r in rows)
+    if total_vol <= 0:
+        total_vol = float(len(rows))
+        for r in rows:
+            r["quote_vol"] = 1.0
+    med = _median([r["price"] for r in rows])
+    for r in rows:
+        dev = abs(r["price"] / med - 1.0)
+        r["dev_pct"] = round(dev * 100.0, 4)
+        if dev > HARD_DEV:
+            q = 0.0
+        elif dev > DEV_BAND:
+            q = 0.25
+        else:
+            q = 1.0
+        r["quality"] = q
+        r["liq_share"] = round(float(r["quote_vol"]) / total_vol, 4)
+        r["w"] = r["liq_share"] * q
+    W = sum(r["w"] for r in rows)
+    if W <= 0:
+        for r in rows:
+            r["w"] = r["liq_share"] if r["liq_share"] > 0 else 0.0
+        W = sum(r["w"] for r in rows) or 1.0
+    for _ in range(2):
+        over = [r for r in rows if r["w"] / W > max_share]
+        if not over:
+            break
+        cap = max_share * W
+        excess = sum(r["w"] - cap for r in over)
+        for r in over:
+            r["w"] = cap
+        rest = [r for r in rows if r not in over]
+        rest_sum = sum(r["w"] for r in rest)
+        if rest_sum > 0:
+            for r in rest:
+                r["w"] += excess * r["w"] / rest_sum
+        W = sum(r["w"] for r in rows) or 1.0
+    weighted = sum(r["price"] * r["w"] for r in rows) / W
+    for r in rows:
+        r["weight"] = round(r["w"] / W, 4)
+    sw = sum(r["weight"] ** 2 for r in rows)
+    eff_n = round((1.0 / sw) if sw else 0.0, 2)
+    top_share = max(r["weight"] for r in rows)
+    max_dev = max(r["dev_pct"] for r in rows)
+    if len(rows) >= 4 and max_dev <= 0.15 and top_share <= MAX_SHARE + 1e-6:
+        conf = "high"
+    elif len(rows) >= 3 and max_dev <= 0.50:
+        conf = "medium"
+    else:
+        conf = "low"
+    return {
+        "n": len(rows),
+        "weighted": round(weighted, 4),
+        "median": round(med, 4),
+        "max_dev_pct": round(max_dev, 4),
+        "effective_n": eff_n,
+        "top_share": round(top_share, 4),
+        "confidence": conf,
+        "sources": rows,
+    }
+
+
 def aggregate(symbol: str) -> dict:
-    """Weighted price across reachable sources; blocked venues skipped for 30 min."""
     rows = []
     for fn in SOURCES:
         name = fn.__name__.lstrip("_")
@@ -128,14 +199,4 @@ def aggregate(symbol: str) -> dict:
         except Exception:
             _mark(name)
             continue
-    if not rows:
-        return {}
-    total = sum(r["quote_vol"] for r in rows) or 1.0
-    for r in rows:
-        r["share"] = round(r["quote_vol"] / total, 3)
-    weighted = sum(r["price"] * r["quote_vol"] for r in rows) / total
-    prices = sorted(r["price"] for r in rows)
-    med = prices[len(prices) // 2]
-    dev = max(abs(r["price"] / med - 1.0) for r in rows) * 100.0
-    return {"n": len(rows), "weighted": round(weighted, 2), "median": round(med, 2),
-            "max_dev_pct": round(dev, 3), "sources": rows}
+    return combine(rows)
