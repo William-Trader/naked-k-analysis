@@ -9,7 +9,8 @@
   "cooldown_min": {
     "P0": 60,
     "P1": 120,
-    "P2": 360
+    "P2": 360,
+    "volume_spike": 240
   },
   "quiet_hours": [
     23,
@@ -25,7 +26,9 @@
     "extreme_shock_atr": 2,
     "extreme_pct": 1.5,
     "extreme_pct_1h": 3,
-    "vol_z": 3,
+    "vol_z": 5,
+    "vol_ratio": 3,
+    "vol_ratio_p1": 5,
     "breakout_vol_z": 1,
     "min_quality": 40
   }

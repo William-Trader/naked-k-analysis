@@ -35,6 +35,7 @@ from .micro import analyse as micro_analyse
 from .volstruct import analyse as volstruct_analyse
 from .cross import analyse as cross_analyse
 from .trades import trades as trades_analyse, book as book_analyse
+from .sources import aggregate as sources_aggregate
 from . import always_in as ai_state
 from .legs import decompose as leg_decompose, maturity as leg_maturity, exhaustion as leg_exhaustion
 from .quality import gates as data_gates
@@ -86,6 +87,20 @@ def summarise(symbol: str) -> tuple[str, dict]:
         f"24h volume: {fmt(float(t['volume']), 1)} {base} "
         f"| 24h quote: {fmt(float(t['quoteVolume']) / 1e6, 1)}M USDT"
     )
+    try:
+        mx = sources_aggregate(symbol)
+        if mx:
+            src = ",".join(
+                f"{r['source']}:{r['price']}" for r in mx["sources"]
+            )
+            lines.append(
+                f"MULTI|{base}|n={mx['n']}|weighted={mx['weighted']}"
+                f"|median={mx['median']}|dev={mx['max_dev_pct']}%|{src}"
+            )
+            if mx["max_dev_pct"] > 0.5:
+                lines.append(f"DATA_WARN|{base}|source_dev={mx['max_dev_pct']}%")
+    except Exception:
+        pass
     lines.append("")
     lines.append("--- structure (4h) ---")
     lines.append(

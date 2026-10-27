@@ -244,6 +244,15 @@ def add_outcome(path: str, signal_id: int, horizon: int, ts: int, price,
         conn.close()
 
 
+def mark_status(path: str, alert_id: int, status: str) -> None:
+    conn = connect(path)
+    try:
+        conn.execute("UPDATE alerts SET status = ? WHERE id = ?", (status, alert_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def mark_stale(path: str, alert_id: int) -> None:
     conn = connect(path)
     try:

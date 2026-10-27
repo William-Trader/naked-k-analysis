@@ -114,8 +114,11 @@ def compose_event(event: dict) -> str:
                 lines.append(f"关键位：站上 {price + 0.5 * implied_atr:,.0f} 才算真突破；"
                              f"跌回 {price - 0.5 * implied_atr:,.0f} 下方就是假突破。")
     elif kind == "volume_spike":
-        vz = p.get("vol_z") or 0.0
-        lines.append(f"成交量突然放大（约 {vz:.1f} 倍平时），价格几乎没动")
+        ratio = p.get("vol_ratio")
+        if ratio:
+            lines.append(f"成交量突然放大（约 {ratio:.1f} 倍平时），价格几乎没动")
+        else:
+            lines.append("成交量突然放大，价格几乎没动")
         lines.append(f"现价 {price:,.2f}")
         lines.append("含义：有人在大量换手，但方向还没定，别把放量当成方向。")
         lines.append("现在怎么做：等这一根 K 线收盘。收在高位偏多，收在低位偏空，不猜。")

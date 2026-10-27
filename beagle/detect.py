@@ -17,7 +17,7 @@ def _ev(ts, symbol, kind, severity, direction, price, quality=50, **payload):
 
 
 def detect_events(symbol, features, close_1m, prev_close_1m, vol_z_1m,
-                  funding=None, prev_state=None, cfg=None):
+                  vol_ratio_1m=None, funding=None, prev_state=None, cfg=None):
     cfg = cfg or {}
     th = cfg.get("thresholds", {})
     ts = int(time.time() * 1000)
@@ -42,10 +42,15 @@ def detect_events(symbol, features, close_1m, prev_close_1m, vol_z_1m,
                               quality=min(100, 40 + ratio * 30 + max(0, vol_z_1m or 0) * 5),
                               move_pct=move_pct, atr_ratio=ratio))
 
-    if vol_z_1m is not None and vol_z_1m >= th.get("vol_z", 3.0):
-        events.append(_ev(ts, symbol, "volume_spike", "P1", None, close_1m,
+    min_z = th.get("vol_z", 5.0)
+    min_ratio = th.get("vol_ratio", 3.0)
+    if (vol_z_1m is not None and vol_z_1m >= min_z
+            and (vol_ratio_1m or 0.0) >= min_ratio):
+        sev = "P1" if (vol_ratio_1m or 0.0) >= th.get("vol_ratio_p1", 5.0) else "P2"
+        events.append(_ev(ts, symbol, "volume_spike", sev, None, close_1m,
                           quality=min(100, 35 + vol_z_1m * 10 + abs(move_pct) * 20),
-                          vol_z=vol_z_1m, move_pct=move_pct))
+                          vol_z=vol_z_1m, vol_ratio=round(float(vol_ratio_1m), 2),
+                          move_pct=move_pct))
 
     lo, hi = features.get("r20_lo"), features.get("r20_hi")
     if lo and hi and close_1m:
