@@ -74,6 +74,10 @@ def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20
             results.append({"id": a["id"], "status": "stale_skip",
                             "age_min": round((now_ms - int(a["created_at"])) / 60_000, 1)})
             continue
+        if a["severity"] == "P2":
+            store.mark_status(db_path, a["id"], "p2_deferred")
+            results.append({"id": a["id"], "status": "p2_deferred"})
+            continue
         if _quiet(time.localtime().tm_hour, cfg) and a["severity"] != "P0":
             results.append({"id": a["id"], "status": "quiet_skip"})
             continue

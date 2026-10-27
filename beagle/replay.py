@@ -4,7 +4,7 @@ from __future__ import annotations
 import bisect
 import time
 
-from nakedk.features import features_from_klines
+from nakedk.features import features_from_klines, volume_z
 from nakedk.fetch import get_json
 
 from .detect import detect_events
@@ -54,13 +54,15 @@ def replay(symbol: str, days: float = 1.0, cfg: dict | None = None) -> list[dict
         window = m1[max(0, i - 20): i + 1]
         vols = [float(r[5]) for r in window]
         vol_z = 0.0
+        vol_ratio = 0.0
         if len(vols) > 2:
-            base = vols[:-1]
-            mu = sum(base) / len(base)
-            sd = (sum((v - mu) ** 2 for v in base) / len(base)) ** 0.5 or 1.0
-            vol_z = (vols[-1] - mu) / sd
+            vol_z = volume_z(vols, 42)
+            base = sorted(vols[:-1])
+            med = base[len(base) // 2]
+            vol_ratio = (vols[-1] / med) if med else 0.0
         evs = detect_events(
-            symbol, f, float(m1[i][4]), float(m1[i - 1][4]), vol_z, None, None, cfg
+            symbol, f, float(m1[i][4]), float(m1[i - 1][4]), vol_z,
+            vol_ratio_1m=vol_ratio, cfg=cfg
         )
         for e in evs:
             e["ts"] = ts

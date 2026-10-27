@@ -5,7 +5,7 @@ import json
 import sys
 import time
 
-from nakedk.features import features_from_klines
+from nakedk.features import features_from_klines, volume_z
 from nakedk.fetch import get_json
 
 from . import store
@@ -37,16 +37,18 @@ def snapshot(symbol: str) -> dict:
     closes = [float(r[4]) for r in k1m]
     vols = [float(r[5]) for r in k1m]
     vol_z = 0.0
+    vol_ratio = 0.0
     if len(vols) >= 20:
-        base = vols[-20:-1]
-        mu = sum(base) / len(base)
-        sd = (sum((v - mu) ** 2 for v in base) / len(base)) ** 0.5 or 1.0
-        vol_z = (vols[-1] - mu) / sd
+        vol_z = volume_z(vols, 42)
+        base = sorted(vols[-20:-1])
+        med = base[len(base) // 2]
+        vol_ratio = (vols[-1] / med) if med else 0.0
     return {
         "features": features,
         "close_1m": closes[-1] if closes else None,
         "prev_close_1m": closes[-2] if len(closes) > 1 else None,
         "vol_z_1m": vol_z,
+        "vol_ratio_1m": vol_ratio,
         "funding": funding_rate(symbol),
     }
 
@@ -71,7 +73,7 @@ def run_once(cfg: dict, db_path: str) -> list[dict]:
         prev_state = store.get_state(db_path, symbol)
         events = detect_events(
             symbol, snap["features"], snap["close_1m"], snap["prev_close_1m"],
-            snap["vol_z_1m"], snap["funding"], prev_state, cfg,
+            snap["vol_z_1m"], snap["vol_ratio_1m"], snap["funding"], prev_state, cfg,
         )
         store.set_state(db_path, symbol, snap["features"].get("trend"))
         for ev in events:

@@ -22,8 +22,22 @@ class TestDetect(unittest.TestCase):
         self.assertIn("price_shock_extreme", [e["kind"] for e in ev])
 
     def test_volume_spike(self):
-        ev = detect_events("BTCUSDT", feat(), 1000.0, 1000.0, 4.0)
+        ev = detect_events("BTCUSDT", feat(), 1000.0, 1000.0, 6.0, vol_ratio_1m=4.0)
         self.assertIn("volume_spike", [e["kind"] for e in ev])
+
+    def test_volume_requires_ratio(self):
+        ev = detect_events("BTCUSDT", feat(), 1000.0, 1000.0, 10.0, vol_ratio_1m=1.5)
+        self.assertNotIn("volume_spike", [e["kind"] for e in ev])
+
+    def test_volume_p2_between(self):
+        ev = detect_events("BTCUSDT", feat(), 1000.0, 1000.0, 6.0, vol_ratio_1m=3.5)
+        v = [e for e in ev if e["kind"] == "volume_spike"][0]
+        self.assertEqual(v["severity"], "P2")
+
+    def test_volume_p1_high(self):
+        ev = detect_events("BTCUSDT", feat(), 1000.0, 1000.0, 8.0, vol_ratio_1m=6.0)
+        v = [e for e in ev if e["kind"] == "volume_spike"][0]
+        self.assertEqual(v["severity"], "P1")
 
     def test_range_break_up(self):
         ev = detect_events("BTCUSDT", feat(), 1100.0, 1090.0, 1.5)
