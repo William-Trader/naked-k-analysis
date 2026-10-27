@@ -65,6 +65,33 @@ def fmt(x, nd=2) -> str:
     return f"{x:,.{nd}f}"
 
 
+def _analogs_cached(symbol: str, k4):
+    """Cache the analog table per (symbol, bar) so repeated calls skip the scan."""
+    path = os.environ.get("NK_ANALOGS_CACHE") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "state", "analogs_cache.json")
+    key = f"{symbol}:{int(k4[-1][0])}"
+    try:
+        with open(path, encoding="utf-8") as fh:
+            cache = json.load(fh)
+    except Exception:
+        cache = {}
+    if key in cache:
+        return cache[key]
+    table = analogs_build(k4, horizon=1)
+    cache[key] = table
+    if len(cache) > 40:
+        for k in list(cache)[:-40]:
+            cache.pop(k, None)
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(cache, fh)
+    except Exception:
+        pass
+    return table
+
+
 def summarise(symbol: str) -> tuple[str, dict]:
     """Return (human text, features) for one symbol."""
     t = ticker(symbol)
@@ -99,6 +126,21 @@ def summarise(symbol: str) -> tuple[str, dict]:
             )
             if mx["max_dev_pct"] > 0.5:
                 lines.append(f"DATA_WARN|{base}|source_dev={mx['max_dev_pct']}%")
+            try:
+                import time as _time
+                log_path = os.environ.get("NK_MULTI_LOG") or os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    "state", "multi_log.jsonl")
+                rec = {"ts": int(_time.time() * 1000), "symbol": symbol,
+                       "n": mx["n"], "weighted": mx["weighted"],
+                       "dev": mx["max_dev_pct"], "conf": mx["confidence"],
+                       "eff_n": mx["effective_n"],
+                       "prices": {r["source"]: r["price"] for r in mx["sources"]}}
+                os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
+                with open(log_path, "a", encoding="utf-8") as fh:
+                    fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+            except Exception:
+                pass
     except Exception:
         pass
     lines.append("")
@@ -338,7 +380,7 @@ def summarise(symbol: str) -> tuple[str, dict]:
             pass
         try:
             key = analogs_bucket(f)
-            row = analogs_build(k4, horizon=1).get(key)
+            row = _analogs_cached(symbol, k4).get(key)
             source = "full"
             if not row or row["n"] < 100:
                 pkey = analogs_regime(f)
