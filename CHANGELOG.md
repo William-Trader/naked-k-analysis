@@ -8,7 +8,9 @@
 - `dashboard/server.py` 自行把仓库根加入 `sys.path`，`python3 dashboard/server.py` 在任意 cwd 下都能导入 `nakedk` / `beagle`，不再直接抛 `ModuleNotFoundError` 导致整页空白。
 
 ### 性能
-- 行情抓取改为并发：两个标的的 ticker / K 线 / 多周期 / 日线一次并发取回（冷启动约 25s → 约 4s）。
+- 行情抓取改为并发：两个标的的 ticker / K 线 / 多周期 / 日线一次并发取回（本地冷启动约 25s → 约 4s）。
+- 多周期的 1d/4h/1h K 线并入同一批并发请求，`mtf_alignment` 不再串行取数（远端冷构建 31s → 约 15s，取决于链路）。
+- 最近一次 payload 落盘 `state/overview_<tf>.json`，重启后首个请求直接命中磁盘缓存（实测 3ms），后台再刷新。
 - 缓存策略改为 fresh 60s + stale-while-revalidate（15 分钟内直接返回旧数据并后台刷新），前端轮询基本 0 等待（热请求约 2ms）。
 - 启动时后台预热 4h/1h/1d，首个访问不再等冷构建。
 - 前端图表不再每次轮询销毁重建：复用 Lightweight Charts 实例，只 `setData` 更新；`autoSize` 自适应容器；K 线与摆动点/形态标注合并为一次 `setMarkers`；请求可中断（AbortController），切换周期不再堆积响应。
