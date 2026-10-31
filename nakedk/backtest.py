@@ -88,7 +88,16 @@ def _passes_gate(f, s, gate):
 
 
 def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
-              gate=None, tag_setups: bool = False, params=None, feats=None) -> list:
+              gate=None, tag_setups: bool = False, params=None, feats=None,
+              slippage_bps: float = 0.0, funding_bps: float = 0.0) -> list:
+    """Simulate the deterministic stance over a bar range.
+
+    Cost model (all in basis points, 1 bp = 0.01%):
+      cost_bps     — round-trip fee (default 12, i.e. 6 bp per side)
+      slippage_bps — round-trip market-impact estimate (entry + exit)
+      funding_bps  — per-bar funding cost for perpetuals, charged for the
+                      full hold (horizon bars). 0 for spot / indices / metals.
+    """
     trades = []
     for i in range(lo, hi):
         window = ks[: i + 1][-200:]
@@ -159,7 +168,8 @@ def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
         else:
             raw = (exit_ / entry - 1.0) * 100.0
             gross = raw if s["direction"] == "long" else -raw
-        net = gross - cost_bps / 100.0
+        total_bps = cost_bps + slippage_bps + funding_bps * horizon
+        net = gross - total_bps / 100.0
         trades.append({
             "ts": ks[i][0], "direction": s["direction"],
             "confidence": s["confidence"], "gross_ret": round(gross, 3),
@@ -279,15 +289,19 @@ def _stats(trades: list) -> dict:
 
 def run(symbol: str, days: int = 365, horizon: int = 1, warmup: int = 60,
         cost_bps: float = DEFAULT_COST_BPS, intrabar: bool = True, gate=None,
-        tag_setups: bool = False) -> dict:
+        tag_setups: bool = False, slippage_bps: float = 0.0,
+        funding_bps: float = 0.0) -> dict:
     ks = fetch_history(symbol, "4h", days)
     path_ks = fetch_history(symbol, "1h", days) if intrabar else None
     lo = min(warmup, max(0, len(ks) // 4))
     hi = max(lo, len(ks) - horizon)
-    trades = _simulate(ks, lo, hi, horizon, cost_bps, path_ks, gate, tag_setups)
+    trades = _simulate(ks, lo, hi, horizon, cost_bps, path_ks, gate,
+                       tag_setups, slippage_bps=slippage_bps,
+                       funding_bps=funding_bps)
     out = {
         "symbol": symbol, "days": days, "bars": len(ks),
-        "cost_bps": cost_bps, "intrabar": intrabar, "gate": gate,
+        "cost_bps": cost_bps, "slippage_bps": slippage_bps,
+        "funding_bps": funding_bps, "intrabar": intrabar, "gate": gate,
         "trade_fraction": round(100.0 * len(trades) / max(1, hi - lo), 1),
     }
     out.update(_stats(trades))
@@ -297,7 +311,8 @@ def run(symbol: str, days: int = 365, horizon: int = 1, warmup: int = 60,
 def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
                  warmup: int = 60, cost_bps: float = DEFAULT_COST_BPS,
                  intrabar: bool = True, gate=None, tag_setups: bool = False,
-                 params=None) -> dict:
+                 params=None, slippage_bps: float = 0.0,
+                 funding_bps: float = 0.0) -> dict:
     ks = fetch_history(symbol, "4h", days)
     path_ks = fetch_history(symbol, "1h", days) if intrabar else None
     lo = min(warmup, max(0, len(ks) // 4))
@@ -309,7 +324,8 @@ def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
         a = lo + span * k // folds
         b = lo + span * (k + 1) // folds
         trades = _simulate(ks, a, b, horizon, cost_bps, path_ks, gate,
-                           tag_setups, params)
+                           tag_setups, params, slippage_bps=slippage_bps,
+                           funding_bps=funding_bps)
         row = {"fold": k + 1, "bars": b - a}
         row.update(_stats(trades))
         results.append(row)
@@ -317,7 +333,9 @@ def walk_forward(symbol: str, days: int = 365, folds: int = 4, horizon: int = 1,
     scored = [r["hit_rate"] for r in results if r["hit_rate"] is not None]
     return {
         "symbol": symbol, "days": days, "folds": folds, "horizon": horizon,
-        "cost_bps": cost_bps, "intrabar": intrabar, "gate": gate, "bars": len(ks),
+        "cost_bps": cost_bps, "slippage_bps": slippage_bps,
+        "funding_bps": funding_bps, "intrabar": intrabar, "gate": gate,
+        "bars": len(ks),
         "fold_results": results, "positive_folds": positive,
         "fold_stability": round(positive / len(results) * 100.0, 1),
         "hit_rate_spread": (round(max(scored) - min(scored), 1) if len(scored) > 1 else None),
