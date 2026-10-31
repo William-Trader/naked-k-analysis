@@ -1,6 +1,34 @@
 # Changelog
 
+## 3.1.0 — 2026-10-31
+
+领域最强改造：多市场源基座、证据账本、条件 edge、知识检索、本地部署。
+
+### 许可与文档
+- 许可改为 **Personal Use & Group Exchange**（仅供个人使用与团体交流），SPDX 头 12 文件 + NOTICE + WATERMARK + README 徽章同步。
+- README 去 AI 化重写：删掉营销腔，新增「致谢」章节，致敬 Al Brooks、YTC、许佳聪、胡云生、崔海军、陈浩、Adam Grimes、Wyckoff。
+
+### 数据层（源基座）
+- 新增 `nakedk/markets.py`：多市场源基座。XAU/白银/铂金（Yahoo 期货）、美股指数（SPX/NDX/DJI/RUT）、期货（ES/NQ/YM/CL）统一归一化到 Binance K 线格式，供引擎/回测/信号复用；实时 1m/5m 监测仍走加密主流（BTC/ETH）。
+- `nakedk/http.py` 增加 SSL 信任回退（系统 CA 包），修复 python.org macOS 框架构建证书不完整导致的 HTTPS 失败。
+
+### 回测（证据账本）
+- 成本模型扩展：round-trip fee（cost_bps）+ 滑点（slippage_bps）+ 每 bar 资金费（funding_bps × horizon），贯穿 run / walk_forward / _simulate。
+
+### 分析层（条件 edge）
+- 新增 `nakedk/conditional.py`：订单流背离 / 资金费拥挤 / OI 背离三条件分类 + 基于订单流背离的经验概率表（OHLCV 可重建的部分），接入 fetch 输出 `COND|...` 行。
+
+### 知识层（可检索 + 自检）
+- 新增 `nakedk/knowledge.py`：知识库全文检索（`nakedk knowledge <query>`）+ 12 维 practitioner rubric 自动评分（`nakedk rubric <text>`），总分 60、可回溯到文件与行。
+
+### 部署
+- 新增 `bootstrap-local.sh` + `scripts/local_launchd_install.sh`：本地电脑（macOS/Linux）无 sudo / 无 systemd 部署，launchd 常驻。
+
+### 测试
+- 154 → 188 项全过；新增 markets / knowledge / conditional 三组测试。
+
 ## 3.0.1 — 2026-10-31
+
 
 健壮性：网络层统一重试退避（评审缺口 #1）。
 
