@@ -190,7 +190,7 @@ function cardBody(sym,s){
   pats+='<span class="muted" style="font-size:10px"> · 上下文 '+(s.pattern_context||'—')+' · 过滤 '+sup+' 个</span>';
   var sig='方向 <span class="pill" style="color:'+C[dir]+';border:1px solid '+C[dir]+'">'+dir+'</span> · 置信度 <b>'+(st.confidence||'—')+'</b>';
   if(st.entry)sig+=' · entry <b>'+fmt(st.entry,1)+'</b> · stop <b>'+fmt(st.stop,1)+'</b> · target <b>'+fmt(st.target,1)+'</b>';
-  return '<article class="card">'
+  return ''
     +'<div class="card-top"><div><div class="sym">'+sym.replace('USDT','')+'<span class="muted" style="font-size:12px">/USDT</span></div>'
     +'<div class="price">'+fmt(s.price,2)+'</div>'
     +'<div class="chg" style="color:'+col(s.change24h)+'">'+pct(s.change24h)+' · 24h 高/低 '+fmt(s.high24h,1)+' / '+fmt(s.low24h,1)+'</div></div>'
