@@ -340,6 +340,14 @@ def summarise(symbol: str) -> tuple[str, dict]:
                 f"FLOW|{base}|delta={fl['delta']}|cum20={fl['cum_delta']}"
                 f"|pchg={fl['price_chg']}|div={fl['divergence']}|shape={shape}"
             )
+            try:
+                from .conditional import conditions as _conditions
+                cnd = _conditions(f, fl, dv)
+                lines.append(
+                    f"COND|{base}|flow={cnd['flow']}|funding={cnd['funding']}|oi={cnd['oi']}"
+                )
+            except Exception:
+                pass
         try:
             m5 = closed_bars(klines(symbol, "5m", 200), "5m")
             m1 = closed_bars(klines(symbol, "1m", 60), "1m")
