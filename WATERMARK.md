@@ -14,6 +14,7 @@
 | nakedk/fetch.py | NKA-771AC70B |
 | nakedk/http.py | NKA-F913E3A2 |
 | nakedk/markets.py | NKA-2D9520FF |
+| nakedk/params.py | NKA-1834A1A6 |
 | nakedk/knowledge.py | NKA-F513E504 |
 | nakedk/conditional.py | NKA-09E59DB8 |
 | nakedk/score.py | NKA-C43C0A6E |
@@ -22,4 +23,4 @@
 | scripts/pa_cron_setup.sh | NKA-98995EAC |
 | scripts/pa_run.sh | NKA-B3E5AC11 |
 
-**Total marked files: 15**
+**Total marked files: 16**

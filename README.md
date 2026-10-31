@@ -4,7 +4,7 @@ Zero-dependency price-action analysis and multi-frequency monitoring for crypto 
 
 [![ci](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![version](https://img.shields.io/badge/version-3.0.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-1.0.0-blue.svg)](CHANGELOG.md)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#engineering)
 [![License: Personal Use & Group Exchange](https://img.shields.io/badge/License-Personal%20Use%20%26%20Group%20Exchange-blue.svg)](LICENSE)
 [![Watermarked](https://img.shields.io/badge/code-watermarked%20(NKA)-orange.svg)](WATERMARK.md)
@@ -63,7 +63,7 @@ naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸
 - **趋势评分 0–100**：EMA 排列 + ADX 强度 + 区间位置 + 24h 动量；输出 `TREND|...`。
 - **多频监测与提醒**：1m/5m 价格冲击、量能异常、区间突破、状态切换、资金费率；P0/P1/P2 分级。
 - **反馈闭环**：信号落库 → 到期评分（收益、命中、MFE/MAE、盘中先触止损还是目标）→ 分桶复盘 → 自适应权重。
-- **仪表盘**：暗色终端 UI，双币卡片、趋势评分、关键位、方向与三价位、K线图、事件流。
+- **仪表盘**：暗色终端 UI，三选项卡（行情 / 知识库 / 调参）。行情卡用 **TradingView Lightweight Charts** 渲染 K 线（蜡烛 + EMA20/50 + 支撑阻力 + 摆动点 + 形态标注，本地 vendor 零 CDN）；知识库卡内置 Markdown 渲染 + 模块目录，可在线阅读知识体系；调参卡可实时调节 stance/trend/信号K 阈值并持久化。
 - **逐笔与盘口**：最近 1000 笔成交 delta、大单数，top-100 盘口失衡与价差（`TRADES` / `BOOK`）。
 - **相关性门禁**：BTC/ETH 30 日相关 > 0.8 时视为同一风险，自动丢弃较弱一边（代码强制）。
 - **推送防刷**：30 分钟有效期 + 冷却/限流 + 失败重试与死信。
@@ -207,7 +207,7 @@ L6 反馈      SIGNAL → 结果评分 → 校准
 ### 工程化
 
 - 零第三方依赖（Python 标准库 + SQLite）
-- 154 个单测；GitHub Actions（3.10/3.12/3.13）
+- 195 个单测；GitHub Actions（3.10/3.12/3.13）
 - Dockerfile、Makefile、systemd 单元
 - `bootstrap.sh` 一键部署
 

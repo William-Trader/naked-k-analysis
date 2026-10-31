@@ -12,3 +12,9 @@ Commercial use, resale, sublicensing, or incorporation into paid products is pro
 第三方的知识来源（Al Brooks、YTC、许佳聪、胡云生、崔海军、陈浩筹码分布等）仅作学习引用；
 其原著版权归原作者所有。Third-party knowledge sources are referenced for study only;
 their original works remain the property of their authors.
+
+## Vendored third-party code
+
+- `dashboard/vendor/lwc.js` — TradingView Lightweight Charts™ v4.2.0,
+  Copyright (c) 2024 TradingView, Inc., licensed under the Apache License 2.0.
+  Vendored so the dashboard stays fully self-contained (no CDN / no network).

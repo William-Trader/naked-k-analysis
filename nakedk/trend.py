@@ -11,7 +11,14 @@ def _clamp(x, lo=0.0, hi=100.0):
     return max(lo, min(hi, x))
 
 
-def trend_score(f: dict) -> dict:
+def trend_score(f: dict, params: dict | None = None) -> dict:
+    p = params or {}
+    adx_trend = p.get("trend_adx_trend", 20.0)
+    up = p.get("trend_label_up", 60.0)
+    down = p.get("trend_label_down", 40.0)
+    sup = p.get("trend_label_strong_up", 75.0)
+    sdown = p.get("trend_label_strong_down", 25.0)
+
     e20 = f.get("ema20")
     e50 = f.get("ema50")
     p = f.get("price")
@@ -39,21 +46,21 @@ def trend_score(f: dict) -> dict:
         slope -= 3.0
     score = 50.0 + 20.0 * ema * strength + 10.0 * pos_s + 10.0 * mom + slope
     score = _clamp(score)
-    if adx < 20:
+    if adx < adx_trend:
         score = 50.0 + (score - 50.0) * 0.4
 
-    if score >= 75:
+    if score >= sup:
         label = "strong_up"
-    elif score >= 60:
+    elif score >= up:
         label = "up"
-    elif score > 40:
+    elif score > down:
         label = "neutral"
-    elif score > 25:
+    elif score > sdown:
         label = "down"
     else:
         label = "strong_down"
 
-    always_in = "long" if score >= 60 else ("short" if score <= 40 else "neutral")
+    always_in = "long" if score >= up else ("short" if score <= down else "neutral")
     return {
         "score": round(score, 1),
         "label": label,
