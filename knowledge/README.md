@@ -16,7 +16,9 @@
 | 10-albrooks-taxonomy.md | Al Brooks 术语全集与引擎映射 |
 | 11-risk-management.md | 交易者方程、止损、实际风险、订单类型（Video 30/32/33/34） |
 | 12-swing-scalp.md | 波段 vs 剥头皮的量化画像 + 程序化交易认知（Video 31/5） |
-| playbook.json | 机器可读的规则/权重摘要 |
+| 13-quantitative-parameters.md | Brooks 实证概率数字全集（80%/70%/40%/60%…） |
+| 14-pattern-details.md | 三角形/头肩/圆弧/窄幅组合/微通道细节补遗 |
+| playbook.json | 机器可读的规则/权重/概率参数摘要 |
 
 ## 使用方式
 - 机器人：先跑 `pa_fetch.py` 拿结构指标，再按 05 的流程、用 03 的 setup、04 的主力检查，最后按 06 输出。

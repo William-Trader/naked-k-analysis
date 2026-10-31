@@ -37,6 +37,25 @@
     "swing_min_reward_multiple": 2.0,
     "scalp_winrate_range": [0.60, 0.90]
   },
+  "probability_parameters": {
+    "trend_reversal_fail_rate": 0.80,
+    "tr_breakout_fail_rate": 0.80,
+    "reversal_base_win_rate": 0.40,
+    "reversal_min_rr": 2.0,
+    "channel_time_fraction": 0.70,
+    "channel_min_touches": 2,
+    "tr_day_fraction": [0.70, 0.80],
+    "strong_bo_mm_prob": [0.60, 0.70],
+    "strong_bear_bo_2nd_leg_prob": 0.60,
+    "mtr_to_swing_prob": 0.40,
+    "mtr_after_bo_prob": 0.60,
+    "wedge_in_trend_fail_rate": 0.80,
+    "wedge_base_rule": 0.75,
+    "hsb_breakout_win_prob": 0.60,
+    "climax_after_bars": 20,
+    "climax_reverse_prob": 0.50,
+    "bull_flag_fail_rate": 0.40
+  },
   "scoring": {
     "higher_timeframe_alignment": 20,
     "location": 20,
