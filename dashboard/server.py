@@ -41,11 +41,41 @@ TOKEN = os.environ.get("NK_DASH_TOKEN", "")
 CACHE_TTL = 60          # serve exactly this fresh window
 STALE_TTL = 900         # after that, serve stale while refreshing in background
 SYMBOLS = ("BTCUSDT", "ETHUSDT")
+CACHE_DIR = os.environ.get("NK_CACHE_DIR") or os.path.join(_REPO_ROOT, "state")
 _cache = {}
 _lock = threading.Lock()
 _build_locks = {}
 _refreshing = set()
-_exec = ThreadPoolExecutor(max_workers=8, thread_name_prefix="nk-fetch")
+_exec = ThreadPoolExecutor(max_workers=16, thread_name_prefix="nk-fetch")
+
+
+def _cache_path(interval):
+    return os.path.join(CACHE_DIR, "overview_%s.json" % interval)
+
+
+def _load_disk_cache():
+    """Warm the in-memory cache from the last payload so a restart is instant."""
+    for interval in VALID:
+        try:
+            with open(_cache_path(interval), encoding="utf-8") as fh:
+                obj = json.load(fh)
+            if isinstance(obj, dict) and obj.get("data") and obj.get("ts"):
+                _cache[interval] = {"ts": int(obj["ts"]), "data": obj["data"]}
+        except Exception:
+            pass
+
+
+def _save_disk_cache(interval, out):
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        p = _cache_path(interval)
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump({"ts": int(time.time() * 1000), "data": out},
+                      fh, ensure_ascii=False)
+        os.replace(tmp, p)
+    except Exception:
+        pass
 
 
 def _interval_lock(interval):
@@ -118,25 +148,41 @@ def _refresh_async(interval):
 
 
 def _prefetch(interval):
-    """Fetch every network resource for all symbols concurrently."""
+    """Fetch every network resource for all symbols concurrently.
+
+    Includes the three MTF timeframes, so `mtf_alignment` never blocks on a
+    sequential 1d/4h/1h fetch chain (the dominant cold-build cost on slow links).
+    """
+    tf_limits = {"1d": 120, "4h": 200, "1h": 200}
     futs = {}
     for sym in SYMBOLS:
         futs[(sym, "ticker")] = _exec.submit(ticker, sym)
         futs[(sym, "klines")] = _exec.submit(klines, sym, interval, 200)
-        futs[(sym, "mtf")] = _exec.submit(mtf_alignment, sym)
         futs[(sym, "day")] = _exec.submit(klines, sym, "1d", 5)
+        for tf, lim in tf_limits.items():
+            futs[(sym, "mtf_" + tf)] = _exec.submit(klines, sym, tf, lim)
     bundle = {}
     for sym in SYMBOLS:
         t = futs[(sym, "ticker")].result()
         ks = futs[(sym, "klines")].result()
         try:
-            mtf = futs[(sym, "mtf")].result()
-        except Exception:
-            mtf = {"by_tf": {"1d": 0, "4h": 0, "1h": 0}, "alignment": 0, "label": "unknown"}
-        try:
             day = futs[(sym, "day")].result()
         except Exception:
             day = []
+        ks_cache = {(sym, interval): ks}
+        for tf in tf_limits:
+            try:
+                ks_cache[(sym, tf)] = futs[(sym, "mtf_" + tf)].result()
+            except Exception:
+                pass
+
+        def _klines(symbol, tf, limit, _cache=ks_cache):
+            return _cache.get((symbol, tf)) or klines(symbol, tf, limit)
+
+        try:
+            mtf = mtf_alignment(sym, klines_fn=_klines)
+        except Exception:
+            mtf = {"by_tf": {"1d": 0, "4h": 0, "1h": 0}, "alignment": 0, "label": "unknown"}
         bundle[sym] = (t, ks, mtf, day)
     return bundle
 
@@ -263,6 +309,7 @@ def _build_uncached(interval, now):
         out["db_error"] = str(e)
     out["elapsed_ms"] = int((time.time() * 1000) - now)
     _cache[interval] = {"ts": int(time.time() * 1000), "data": out}
+    _save_disk_cache(interval, out)
     return out
 
 
@@ -425,6 +472,7 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
+    _load_disk_cache()
 
     def _warm():
         # Pre-build so the first browser hit is instant instead of waiting
