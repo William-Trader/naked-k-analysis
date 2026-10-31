@@ -7,3 +7,11 @@ data/
 beagle.db
 .beagle.env
 *.sqlite
+
+# runtime state (blocked sources, caches) — not tracked
+state/
+
+# runtime sqlite state (created by fetch/signal smoke runs)
+ai_state.db
+patterns.db
+*.db
