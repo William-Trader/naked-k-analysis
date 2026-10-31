@@ -83,6 +83,26 @@ def cmd_score(args) -> int:
     return 0
 
 
+def cmd_knowledge(args) -> int:
+    from .knowledge import search
+    for r in search(args.query, limit=args.limit):
+        print(f"#{r['file']}  (score={r['score']})")
+        for t in r["top"]:
+            print(f"  {t['line'][:110]}")
+    return 0
+
+
+def cmd_rubric(args) -> int:
+    from .knowledge import score_briefing
+    text = "".join(args.text)
+    r = score_briefing(text)
+    print(f"rubric total: {r['total']}/60  ({r['verdict']})")
+    for d in r["dimensions"]:
+        bar = "#" * d["score"]
+        print(f"  {d['name']:<14} {d['score']}/5  {bar}")
+    return 0
+
+
 def cmd_backtest(args) -> int:
     from .backtest import run, walk_forward
     folds = getattr(args, "folds", 1) or 1
@@ -130,6 +150,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_score = sub.add_parser("score", help="score a JSONL signal ledger against real prices")
     p_score.add_argument("ledger")
     p_score.set_defaults(func=cmd_score)
+
+    p_kb = sub.add_parser("knowledge", help="full-text search the knowledge base")
+    p_kb.add_argument("query")
+    p_kb.add_argument("--limit", type=int, default=8)
+    p_kb.set_defaults(func=cmd_knowledge)
+
+    p_rub = sub.add_parser("rubric", help="score a briefing against the 12-dim rubric")
+    p_rub.add_argument("text", nargs="+")
+    p_rub.set_defaults(func=cmd_rubric)
 
     p_bt = sub.add_parser("backtest", help="walk-forward backtest of the deterministic engine")
     p_bt.add_argument("symbols", nargs="+")
