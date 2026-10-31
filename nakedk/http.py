@@ -14,13 +14,39 @@
 from __future__ import annotations
 
 import json
+import os
 import random
+import ssl
 import time
 import urllib.error
 import urllib.request
 
 UA = {"User-Agent": "naked-k-analysis/2.1"}
 RETRYABLE_HTTP = {429, 418}
+
+# Common system CA bundles. Some Python installs ship an incomplete bundled
+# cert.pem (e.g. the python.org macOS framework build); falling back to the
+# OS trust store keeps HTTPS working on those hosts without any new dependency.
+_SYSTEM_CA_PATHS = (
+    "/etc/ssl/cert.pem",                          # macOS (Homebrew/LibreSSL)
+    "/etc/ssl/certs/ca-certificates.crt",          # Debian / Ubuntu
+    "/etc/pki/tls/certs/ca-bundle.crt",            # RHEL / CentOS
+    "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+)
+
+
+def _ssl_context():
+    """Return an SSL context that works even when the bundled CA is broken."""
+    for cafile in _SYSTEM_CA_PATHS:
+        if os.path.exists(cafile):
+            try:
+                return ssl.create_default_context(cafile=cafile)
+            except Exception:
+                continue
+    try:
+        return ssl.create_default_context()
+    except Exception:
+        return None
 
 
 def _retry_after(err) -> float | None:
@@ -43,15 +69,17 @@ def get_json(url, timeout=15, max_retries=3, proxy=None):
     last = None
     for attempt in range(max_retries + 1):
         req = urllib.request.Request(url, headers=UA)
+        ctx = _ssl_context()
         opener = None
         if proxy:
             opener = urllib.request.build_opener(
-                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
+                urllib.request.HTTPSHandler(context=ctx))
         try:
             if opener:
                 with opener.open(req, timeout=timeout) as r:
                     return json.loads(r.read().decode())
-            with urllib.request.urlopen(req, timeout=timeout) as r:
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
                 return json.loads(r.read().decode())
         except urllib.error.HTTPError as e:
             last = e

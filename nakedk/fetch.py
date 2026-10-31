@@ -51,10 +51,20 @@ def get_json(path: str, timeout: int = 15):
 
 
 def ticker(symbol: str) -> dict:
+    """24h ticker, market-aware (Binance for crypto, Yahoo otherwise)."""
+    from .markets import resolve, yahoo_ticker
+    provider, tkr, _kind = resolve(symbol)
+    if provider == "yahoo":
+        return yahoo_ticker(tkr)
     return get_json(f"/api/v3/ticker/24hr?symbol={symbol}")
 
 
 def klines(symbol: str, interval: str = "4h", limit: int = 200):
+    """Klines, market-aware (Binance for crypto, Yahoo otherwise)."""
+    from .markets import resolve, yahoo_klines
+    provider, tkr, _kind = resolve(symbol)
+    if provider == "yahoo":
+        return yahoo_klines(tkr, interval, limit)
     return get_json(f"/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}")
 
 

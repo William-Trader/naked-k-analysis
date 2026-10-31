@@ -21,7 +21,7 @@ BAR_MS = {"1h": 3600_000, "4h": 4 * 3600_000}
 DEFAULT_COST_BPS = 12.0
 
 
-def fetch_history(symbol: str, interval: str = "4h", days: int = 365):
+def _binance_history(symbol: str, interval: str = "4h", days: int = 365):
     end = int(time.time() * 1000)
     start = end - days * 86_400_000
     out, cursor = [], start
@@ -38,6 +38,16 @@ def fetch_history(symbol: str, interval: str = "4h", days: int = 365):
         if len(rows) < 1000:
             break
     return out
+
+
+def fetch_history(symbol: str, interval: str = "4h", days: int = 365):
+    """Market-aware history: Binance for crypto, Yahoo for XAU/indices/futures."""
+    from .markets import resolve, yahoo_klines, _BARS_PER_DAY
+    provider, tkr, _kind = resolve(symbol)
+    if provider == "yahoo":
+        bpd = _BARS_PER_DAY.get(interval, 24)
+        return yahoo_klines(tkr, interval, limit=int(days * bpd))
+    return _binance_history(symbol, interval, days)
 
 
 def _max_drawdown(equity: list) -> float:
