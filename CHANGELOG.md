@@ -1,5 +1,13 @@
 # Changelog
 
+## 3.0.1 — 2026-10-31
+
+健壮性：网络层统一重试退避（评审缺口 #1）。
+
+- 新增 `nakedk/http.py`：JSON GET 共享助手，429/418/5xx/超时/网络抖动做指数退避 + 抖动重试，其余 4xx 立即抛出，尊重 `Retry-After`。
+- `nakedk/fetch.py`（ticker/klines/replay 主取数）、`nakedk/sources.py`（五源加权）、`beagle/monitor.py`（Gate 资金费率）全部改走该助手。
+- 新增 `tests/test_http.py`（重试/退避/4xx 不重试/耗尽抛错）。
+
 ## 3.0.0 — 2026-10-27
 
 大版本：数据可信度、形态覆盖与实时推送口径全面升级。

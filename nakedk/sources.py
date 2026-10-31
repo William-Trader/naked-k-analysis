@@ -55,14 +55,9 @@ def _mark(name: str) -> None:
 
 
 def _get(url: str, timeout: int = 6, proxy: bool = False):
-    req = Request(url, headers=UA)
-    if proxy:
-        opener = urllib.request.build_opener(
-            urllib.request.ProxyHandler({"http": PROXY, "https": PROXY}))
-        with opener.open(req, timeout=timeout) as r:
-            return json.loads(r.read().decode())
-    with urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode())
+    from .http import get_json as _http_get_json
+    return _http_get_json(url, timeout=timeout, max_retries=2,
+                          proxy=PROXY if proxy else None)
 
 
 def _base(symbol: str) -> str:

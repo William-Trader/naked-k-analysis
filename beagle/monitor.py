@@ -23,11 +23,8 @@ def funding_rate(symbol: str) -> float | None:
 
 
 def get_json_gate(path: str):
-    import urllib.request
-    url = "https://api.gateio.ws" + path
-    req = urllib.request.Request(url, headers={"User-Agent": "beagle/1.0"})
-    with urllib.request.urlopen(req, timeout=12) as r:
-        return json.loads(r.read().decode())
+    from nakedk.http import get_json
+    return get_json("https://api.gateio.ws" + path, timeout=12, max_retries=2)
 
 
 def snapshot(symbol: str) -> dict:
