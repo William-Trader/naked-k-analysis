@@ -1,7 +1,7 @@
 # -----------------------------------------------------------------
 # nakedk/knowledge.py - naked-k-analysis knowledge search + rubric
 # (c) 2026 William-Trader (https://github.com/William-Trader)
-# WM: NKA-KNOWL0001
+# WM: NKA-F513E504
 # SPDX-License-Identifier: LicenseRef-NKA-Personal-1.0
 # Removing this mark violates the license.
 # -----------------------------------------------------------------
