@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.1 — 2026-10-31
+
+修复仪表盘空白与加载慢。
+
+### 修复
+- `dashboard/server.py` 自行把仓库根加入 `sys.path`，`python3 dashboard/server.py` 在任意 cwd 下都能导入 `nakedk` / `beagle`，不再直接抛 `ModuleNotFoundError` 导致整页空白。
+
+### 性能
+- 行情抓取改为并发：两个标的的 ticker / K 线 / 多周期 / 日线一次并发取回（冷启动约 25s → 约 4s）。
+- 缓存策略改为 fresh 60s + stale-while-revalidate（15 分钟内直接返回旧数据并后台刷新），前端轮询基本 0 等待（热请求约 2ms）。
+- 启动时后台预热 4h/1h/1d，首个访问不再等冷构建。
+- 前端图表不再每次轮询销毁重建：复用 Lightweight Charts 实例，只 `setData` 更新；`autoSize` 自适应容器；K 线与摆动点/形态标注合并为一次 `setMarkers`；请求可中断（AbortController），切换周期不再堆积响应。
+
+### 文档
+- README 仪表盘截图更新为修复后的真实渲染。
+
 ## 1.0.0 — 2026-10-31
 
 版本统一 v1.0.0：前端升级 + 工程优化。此版本起以 v1.0 为准。

@@ -5,8 +5,16 @@ import gzip
 import json
 import os
 import sqlite3
+import sys
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+
+# Allow `python3 dashboard/server.py` from the repo root (or any cwd):
+# the repo root must be importable so `nakedk` / `beagle` resolve.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -30,9 +38,19 @@ KB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))
 DRAWINGS = os.path.join(os.path.dirname(__file__), "..", "drawings.json")
 PATTERN_DB = os.environ.get("NK_PATTERN_DB", os.path.join(os.path.dirname(__file__), "..", "patterns.db"))
 TOKEN = os.environ.get("NK_DASH_TOKEN", "")
-CACHE_TTL = 60
+CACHE_TTL = 60          # serve exactly this fresh window
+STALE_TTL = 900         # after that, serve stale while refreshing in background
+SYMBOLS = ("BTCUSDT", "ETHUSDT")
 _cache = {}
 _lock = threading.Lock()
+_build_locks = {}
+_refreshing = set()
+_exec = ThreadPoolExecutor(max_workers=8, thread_name_prefix="nk-fetch")
+
+
+def _interval_lock(interval):
+    with _lock:
+        return _build_locks.setdefault(interval, threading.Lock())
 
 
 def load_drawings():
@@ -80,25 +98,86 @@ def structure_label(hs, ls):
     return "重叠/区间"
 
 
+def _refresh_async(interval):
+    """Refresh one interval in the background without blocking readers."""
+    with _lock:
+        if interval in _refreshing:
+            return
+        _refreshing.add(interval)
+
+    def run():
+        try:
+            _build_now(interval)
+        except Exception:
+            pass
+        finally:
+            with _lock:
+                _refreshing.discard(interval)
+
+    threading.Thread(target=run, name="nk-refresh-" + interval, daemon=True).start()
+
+
+def _prefetch(interval):
+    """Fetch every network resource for all symbols concurrently."""
+    futs = {}
+    for sym in SYMBOLS:
+        futs[(sym, "ticker")] = _exec.submit(ticker, sym)
+        futs[(sym, "klines")] = _exec.submit(klines, sym, interval, 200)
+        futs[(sym, "mtf")] = _exec.submit(mtf_alignment, sym)
+        futs[(sym, "day")] = _exec.submit(klines, sym, "1d", 5)
+    bundle = {}
+    for sym in SYMBOLS:
+        t = futs[(sym, "ticker")].result()
+        ks = futs[(sym, "klines")].result()
+        try:
+            mtf = futs[(sym, "mtf")].result()
+        except Exception:
+            mtf = {"by_tf": {"1d": 0, "4h": 0, "1h": 0}, "alignment": 0, "label": "unknown"}
+        try:
+            day = futs[(sym, "day")].result()
+        except Exception:
+            day = []
+        bundle[sym] = (t, ks, mtf, day)
+    return bundle
+
+
 def build(interval="4h"):
+    """Return the dashboard payload, using a fresh cache or stale-while-revalidate."""
     if interval not in VALID:
         interval = "4h"
     now = int(time.time() * 1000)
     c = _cache.get(interval)
-    if c and now - c["ts"] < CACHE_TTL * 1000:
-        return c["data"]
+    if c:
+        age = (now - c["ts"]) / 1000.0
+        if age < CACHE_TTL:
+            return c["data"]
+        if age < STALE_TTL:
+            _refresh_async(interval)
+            return c["data"]
+    return _build_now(interval)
+
+
+def _build_now(interval):
+    """Build the payload once per interval (single-flight); network in parallel."""
+    if interval not in VALID:
+        interval = "4h"
+    with _interval_lock(interval):
+        now = int(time.time() * 1000)
+        c = _cache.get(interval)
+        if c and now - c["ts"] < CACHE_TTL * 1000:
+            return c["data"]
+        return _build_uncached(interval, now)
+
+
+def _build_uncached(interval, now):
     params = load_params()
     out = {"as_of": now, "interval": interval, "symbols": {},
            "events": [], "alerts": [], "params": params}
-    for sym in ("BTCUSDT", "ETHUSDT"):
-        t = ticker(sym)
-        ks = klines(sym, interval, 200)
+    bundle = _prefetch(interval)
+    for sym in SYMBOLS:
+        t, ks, mtf, day = bundle[sym]
         k_closed = closed_bars(ks, interval)
         f = features_from_klines(k_closed)
-        try:
-            mtf = mtf_alignment(sym)
-        except Exception:
-            mtf = {"by_tf": {"1d": 0, "4h": 0, "1h": 0}, "alignment": 0, "label": "unknown"}
         f["mtf_alignment"] = mtf["alignment"]
         st = stance(f, params)
         ts = trend_score(f, params)
@@ -121,7 +200,7 @@ def build(interval="4h"):
         prev_bar = profiles[-2] if len(profiles) > 1 else None
         struct_v2 = structure_of(k_closed)
         vp = vpoc(k_closed)
-        sess = session_levels(closed_bars(klines(sym, "1d", 5), "1d"))
+        sess = session_levels(closed_bars(day, "1d"))
         lv = struct_v2.get("levels", {})
         loc = {
             "edge": edge_zone(f.get("pos20")),
@@ -182,7 +261,8 @@ def build(interval="4h"):
         conn.close()
     except Exception as e:
         out["db_error"] = str(e)
-    _cache[interval] = {"ts": now, "data": out}
+    out["elapsed_ms"] = int((time.time() * 1000) - now)
+    _cache[interval] = {"ts": int(time.time() * 1000), "data": out}
     return out
 
 
@@ -345,5 +425,16 @@ class Handler(BaseHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
+
+    def _warm():
+        # Pre-build so the first browser hit is instant instead of waiting
+        # for a cold 4h payload (~tens of seconds on slow links).
+        for interval in ("4h", "1h", "1d"):
+            try:
+                _build_now(interval)
+            except Exception:
+                pass
+
+    threading.Thread(target=_warm, name="nk-warm", daemon=True).start()
     print(f"naked-k dashboard on :{port}")
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()

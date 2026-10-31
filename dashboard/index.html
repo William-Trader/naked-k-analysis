@@ -121,17 +121,18 @@ footer{max-width:1320px;margin:0 auto;padding:18px 22px 40px;color:var(--muted);
 <footer>分析工具，不构成投资建议。形态为规则候选，需结合上下文确认。图表由 TradingView Lightweight Charts™ 渲染。</footer>
 <script src="/vendor/lwc.js"></script>
 <script>
-var TF='4h', DATA=null, CHARTS={};
+var TF='4h', DATA=null, CHARTS={}, CARDS={}, CTRL=null, LOAD_SEQ=0;
 var C={up:'#ff5b6e',down:'#35d07f',neutral:'#8b9bb4',gold:'#d9b45b',blue:'#5aa9ff',amber:'#f0b35b'};
 var CB=String.fromCharCode(96); var NL=String.fromCharCode(10);
 function fmt(n,d){ if(n===null||n===undefined) return '—'; return Number(n).toLocaleString('en-US',{minimumFractionDigits:d||2,maximumFractionDigits:d||2}); }
 function pct(n){ return (n>=0?'+':'')+Number(n).toFixed(2)+'%'; }
 function col(n){ return n>=0?C.up:C.down; }
-function makeChart(sym, s){
-  var el=document.getElementById('chart-'+sym); if(!el) return;
-  if(CHARTS[sym]){ try{CHARTS[sym].chart.remove();}catch(e){} }
-  if(!window.LightweightCharts){ el.textContent='图表库未加载'; return; }
+function chartFor(sym){
+  if(CHARTS[sym])return CHARTS[sym];
+  var el=document.getElementById('chart-'+sym); if(!el) return null;
+  if(!window.LightweightCharts){ el.textContent='图表库未加载'; return null; }
   var chart=LightweightCharts.createChart(el,{
+    autoSize:true,
     layout:{background:{color:'transparent'},textColor:'#8b9bb4',fontFamily:'Inter,system-ui'},
     grid:{vertLines:{color:'#162335'},horzLines:{color:'#162335'}},
     rightPriceScale:{borderColor:'#1c2a3d'},
@@ -142,26 +143,37 @@ function makeChart(sym, s){
     upColor:'#ff5b6e',downColor:'#35d07f',borderVisible:false,
     wickUpColor:'#ff5b6e',wickDownColor:'#35d07f',
   });
-  candles.setData((s.candles||[]).map(function(k){ return {time:k.t/1000,open:k.o,high:k.h,low:k.l,close:k.c}; }));
-  function addLine(vals,color){
-    var ln=chart.addLineSeries({color:color,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
-    var d=[];(vals||[]).forEach(function(v,i){ if(v===undefined||v===null)return; d.push({time:s.candles[i].t/1000,value:v}); });
-    ln.setData(d);
-  }
-  addLine(s.ema20_series,C.gold); addLine(s.ema50_series,C.blue);
-  function hline(p,color,label){ if(p===null||p===undefined)return; candles.createPriceLine({price:p,color:color,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:label}); }
-  hline(s.r20_lo,C.down,'支撑'); hline(s.r20_hi,C.up,'阻力');
-  function marks(arr,dir){
-    var out=[];(arr||[]).forEach(function(pt){ if(pt.i>=0&&pt.i<s.candles.length){ out.push({time:s.candles[pt.i].t/1000,position:dir,color:dir==='aboveBar'?C.down:C.up,shape:dir==='aboveBar'?'arrowDown':'arrowUp',text:dir==='aboveBar'?'SH':'SL'}); } });
-    return out;
-  }
-  candles.setMarkers(marks(s.swing_marks&&s.swing_marks.highs,'aboveBar').concat(marks(s.swing_marks&&s.swing_marks.lows,'belowBar')));
-  var pm=[];(s.patterns||[]).forEach(function(pt){ if(pt.role==='suppressed')return; if(pt.index!=null&&pt.index>=0&&pt.index<s.candles.length){ var pos=pt.direction==='bullish'?'belowBar':pt.direction==='bearish'?'aboveBar':'belowBar'; pm.push({time:s.candles[pt.index].t/1000,position:pos,color:pt.direction==='bullish'?C.down:pt.direction==='bearish'?C.up:C.gold,shape:'circle',text:pt.type}); } });
-  candles.setMarkers(pm);
-  chart.timeScale().fitContent();
-  CHARTS[sym]={chart:chart};
+  var lineOpts={lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false};
+  var rec={chart:chart,candles:candles,
+    e20:chart.addLineSeries(Object.assign({color:C.gold},lineOpts)),
+    e50:chart.addLineSeries(Object.assign({color:C.blue},lineOpts)),
+    lines:[],first:true};
+  CHARTS[sym]=rec;
+  return rec;
 }
-function card(sym,s){
+function seriesData(vals,ks){
+  var d=[];(vals||[]).forEach(function(v,i){ if(v===undefined||v===null)return; var k=ks[i]; if(!k)return; d.push({time:k.t/1000,value:v}); });
+  return d;
+}
+function updateChart(sym,s){
+  var rec=chartFor(sym); if(!rec) return;
+  var ks=s.candles||[]; if(!ks.length) return;
+  rec.candles.setData(ks.map(function(k){ return {time:k.t/1000,open:k.o,high:k.h,low:k.l,close:k.c}; }));
+  rec.e20.setData(seriesData(s.ema20_series,ks));
+  rec.e50.setData(seriesData(s.ema50_series,ks));
+  rec.lines.forEach(function(l){ try{rec.candles.removePriceLine(l);}catch(e){} });
+  rec.lines=[];
+  function hline(p,color,label){ if(p===null||p===undefined)return; rec.lines.push(rec.candles.createPriceLine({price:p,color:color,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:label})); }
+  hline(s.r20_lo,C.down,'支撑'); hline(s.r20_hi,C.up,'阻力');
+  var mk=[], sm=s.swing_marks||{};
+  function marks(arr,dir){ (arr||[]).forEach(function(pt){ var k=ks[pt.i]; if(!k)return; mk.push({time:k.t/1000,position:dir,color:dir==='aboveBar'?C.up:C.down,shape:dir==='aboveBar'?'arrowDown':'arrowUp',text:dir==='aboveBar'?'SH':'SL'}); }); }
+  marks(sm.highs,'aboveBar'); marks(sm.lows,'belowBar');
+  (s.patterns||[]).forEach(function(pt){ if(pt.role==='suppressed')return; var k=ks[pt.index]; if(!k)return; var pos=pt.direction==='bullish'?'belowBar':pt.direction==='bearish'?'aboveBar':'belowBar'; mk.push({time:k.t/1000,position:pos,color:pt.direction==='bullish'?C.down:pt.direction==='bearish'?C.up:C.gold,shape:'circle',text:pt.type}); });
+  mk.sort(function(a,b){ return a.time-b.time; });
+  rec.candles.setMarkers(mk);
+  if(rec.first){ rec.chart.timeScale().fitContent(); rec.first=false; }
+}
+function cardBody(sym,s){
   var tr=s.trend||{},st=s.stance||{},dir=st.direction||'neutral';
   var mtf=s.mtf||{},sv=s.structure_v2||{},bp=s.bar||{},sb=s.signalbar||{};
   var mtfTxt='MTF '+(mtf.alignment==null?'—':(mtf.alignment>0?'+'+mtf.alignment:String(mtf.alignment)))+' '+(mtf.label||'—');
@@ -190,15 +202,26 @@ function card(sym,s){
     +'<div class="levels">支撑 <b>'+fmt(s.r20_lo,1)+'</b> / '+fmt((s.swing_lows||[]).slice(-1)[0]||s.low24h,1)+' · 阻力 <b>'+fmt(s.r20_hi,1)+'</b> / '+fmt((s.swing_highs||[]).slice(-1)[0]||s.high24h,1)+'</div>'
     +'<div class="levels">'+mtfTxt+' · '+stTxt+' · '+barTxt+sbTxt+'</div>'
     +'<div class="sig">'+sig+'</div>'
-    +'<div style="margin-top:7px;font-size:11px;color:var(--muted)">结构：'+(s.structure||'—')+' · 形态：'+pats+'</div>'
-    +'<div class="chart-wrap"><div class="tv-chart" id="chart-'+sym+'"></div></div>'
-    +'</article>';
+    +'<div style="margin-top:7px;font-size:11px;color:var(--muted)">结构：'+(s.structure||'—')+' · 形态：'+pats+'</div>';
+}
+function createCard(sym){
+  var art=document.createElement('article');
+  art.className='card';
+  art.innerHTML='<div class="card-body"></div><div class="chart-wrap"><div class="tv-chart" id="chart-'+sym+'"></div></div>';
+  return art;
 }
 function render(){
   if(!DATA)return;
   var g=document.getElementById('grid');var keys=Object.keys(DATA.symbols||{});
-  g.innerHTML=keys.map(function(k){return card(k,DATA.symbols[k]);}).join('');
-  keys.forEach(function(sym){ makeChart(sym,DATA.symbols[sym]); });
+  Object.keys(CARDS).forEach(function(k){ if(keys.indexOf(k)<0){ try{g.removeChild(CARDS[k]);}catch(e){} delete CARDS[k]; if(CHARTS[k]){try{CHARTS[k].chart.remove();}catch(e){} delete CHARTS[k];} } });
+  keys.forEach(function(sym,i){
+    var el=CARDS[sym];
+    if(!el){ el=createCard(sym); CARDS[sym]=el; }
+    var at=g.children[i];
+    if(at!==el)g.insertBefore(el,at||null);
+    el.querySelector('.card-body').innerHTML=cardBody(sym,DATA.symbols[sym]);
+    updateChart(sym,DATA.symbols[sym]);
+  });
   var first=keys[0];var dts=first?DATA.symbols[first].data_ts:DATA.as_of;
   document.getElementById('asof').textContent='数据 '+new Date(dts).toLocaleString('zh-CN',{hour12:false})+' · Binance · '+TF;
   var ev=document.getElementById('events');
@@ -210,8 +233,19 @@ function render(){
 }
 async function load(tf){
   TF=tf;document.querySelectorAll('#tf button').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-tf')===tf);});
-  try{var r=await fetch('/api/overview?interval='+tf);DATA=await r.json();render();}
-  catch(e){document.getElementById('asof').textContent='数据源异常';}
+  if(CTRL)CTRL.abort();
+  CTRL=(typeof AbortController!=='undefined')?new AbortController():null;
+  var seq=++LOAD_SEQ;
+  try{
+    var r=await fetch('/api/overview?interval='+tf,{signal:CTRL?CTRL.signal:undefined,cache:'no-store'});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    var d=await r.json();
+    if(seq!==LOAD_SEQ)return;
+    DATA=d;render();
+  }catch(e){
+    if(e&&e.name==='AbortError')return;
+    document.getElementById('asof').textContent='数据源异常';
+  }
 }
 function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function mdToHtml(src){
@@ -342,7 +376,6 @@ document.querySelectorAll('#tabs button').forEach(function(b){
   });
 });
 document.querySelectorAll('#tf button').forEach(function(b){b.addEventListener('click',function(){load(b.getAttribute('data-tf'));});});
-window.addEventListener('resize',function(){ Object.keys(CHARTS).forEach(function(k){try{CHARTS[k].chart.applyOptions({width:document.getElementById('chart-'+k).clientWidth});}catch(e){}}); });
 load('4h');
 setInterval(function(){ if(!document.hidden) load(TF); },60000);
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) load(TF); });
