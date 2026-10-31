@@ -46,9 +46,8 @@ CST = timezone(timedelta(hours=8))
 
 
 def get_json(path: str, timeout: int = 15):
-    req = Request(BASE + path, headers={"User-Agent": "naked-k-analysis/2.0"})
-    with urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode())
+    from .http import get_json as _http_get_json
+    return _http_get_json(BASE + path, timeout=timeout)
 
 
 def ticker(symbol: str) -> dict:
