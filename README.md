@@ -52,7 +52,17 @@ naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸
 
 ## 功能
 
+**行情** — 蜡烛 + EMA20/50 + 支撑阻力 + 摆动点/形态标注：
+
 ![仪表盘](docs/screenshots/dashboard.png)
+
+**知识库** — 15 个知识模块目录 + 内置 Markdown 渲染：
+
+![知识库](docs/screenshots/knowledge.png)
+
+**调参** — stance / trend / 信号K 阈值实时调节并持久化：
+
+![调参](docs/screenshots/params.png)
 
 - **六层分析链**：单根K线编码 → 结构标注（BOS/CHoCH）→ 位置上下文 → 量价关系 → 多周期共振 → 信号K质量，逐层输出机器可读行。
 - **单根K线编码**：实体占比、收盘位置、上下影线、range/body 相对 ATR、与前一根重叠、bar 类型、0–100 清晰度。
