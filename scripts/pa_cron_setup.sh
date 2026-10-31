@@ -3,7 +3,7 @@
 # scripts/pa_cron_setup.sh - naked-k-analysis core price-action data/deploy logic
 # (c) 2026 William-Trader (https://github.com/William-Trader)
 # WM: NKA-98995EAC
-# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# SPDX-License-Identifier: LicenseRef-NKA-Personal-1.0
 # Removing this mark violates the license.
 # -----------------------------------------------------------------
 set -e

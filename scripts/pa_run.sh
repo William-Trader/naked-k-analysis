@@ -3,7 +3,7 @@
 # scripts/pa_run.sh - naked-k-analysis core price-action data/deploy logic
 # (c) 2026 William-Trader (https://github.com/William-Trader)
 # WM: NKA-B3E5AC11
-# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# SPDX-License-Identifier: LicenseRef-NKA-Personal-1.0
 # Removing this mark violates the license.
 # -----------------------------------------------------------------
 cd /home/user
