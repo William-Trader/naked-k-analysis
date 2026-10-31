@@ -1,6 +1,28 @@
 # Changelog
 
+## 1.0.0 — 2026-10-31
+
+版本统一 v1.0.0：前端升级 + 工程优化。此版本起以 v1.0 为准。
+
+### 前端（dashboard）
+- **TradingView Lightweight Charts™** 渲染 K 线（蜡烛 + EMA20/50 + 支撑阻力 + 摆动点 + 形态标注），本地 vendor（`dashboard/vendor/lwc.js`）零 CDN / 零网络依赖。
+- **三选项卡**：行情 / 知识库 / 调参。
+- **知识库选项卡**：内置 Markdown 渲染 + 模块目录（`/api/knowledge`），可在线阅读全部知识模块。
+- **调参选项卡**：实时调节 stance / trend / 信号K 阈值（`/api/params` GET/POST），持久化到 `state/params.json`。
+- 服务端新增静态资源服务（vendor JS）。
+
+### 工程
+- 新增 `nakedk/params.py`：运行时可调决策阈值（stance 的 ADX/位置/止损目标 ATR、trend 标签阈值、信号K质量门槛），默认值即历史行为。
+- `signals.stance` / `trend.trend_score` 支持 `params` 覆盖（默认不改行为，测试全绿）。
+
+### 消息易读性
+- `beagle.detect.alert_text` 重写为中文可读格式：`[P0·需要立刻看] BTC · 极端价格冲击 · +9.00% · 0.9×ATR · price=…`。
+
+### 测试
+- 195 个全过；新增 test_params（调参）、test_detect 消息格式更新。
+
 ## 3.1.0 — 2026-10-31
+
 
 领域最强改造：多市场源基座、证据账本、条件 edge、知识检索、本地部署。
 

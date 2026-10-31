@@ -78,14 +78,36 @@ def detect_events(symbol, features, close_1m, prev_close_1m, vol_z_1m,
     return events
 
 
+_SEV_CN = {"P0": "需要立刻看", "P1": "值得留意", "P2": "仅供观察"}
+_KIND_CN = {
+    "price_shock_extreme": "极端价格冲击",
+    "price_shock": "价格冲击",
+    "volume_spike": "量能异常",
+    "range_break": "区间突破",
+    "state_shift": "结构切换",
+    "funding_extreme": "资金费率极端",
+}
+
+
 def alert_text(event: dict) -> str:
+    """Human-readable one-line alert for QQ / external channels."""
     p = event.get("payload", {})
-    head = f"[{event['severity']}] {event['symbol']} {event['kind']}"
-    bits = [f"q={event.get('quality', 50)}"]
-    for k in ("move_pct", "atr_ratio", "vol_z", "funding", "prev_state", "state", "r20_lo", "r20_hi"):
-        if p.get(k) is not None:
-            v = p[k]
-            bits.append(f"{k}={v:.4f}" if isinstance(v, float) else f"{k}={v}")
-    if event.get("price"):
-        bits.append(f"price={event['price']:.2f}")
-    return head + (" | " + " ".join(bits) if bits else "")
+    sym = (event.get("symbol") or "").replace("USDT", "")
+    sev = event.get("severity", "")
+    kind = event.get("kind", "")
+    head = f"[{sev}·{_SEV_CN.get(sev, sev)}] {sym} · {_KIND_CN.get(kind, kind)}"
+    bits = []
+    if p.get("move_pct") is not None:
+        bits.append(f"{p['move_pct']:+.2f}%")
+    if p.get("atr_ratio") is not None:
+        bits.append(f"{p['atr_ratio']:.1f}×ATR")
+    if p.get("vol_z") is not None:
+        bits.append(f"量 {p['vol_z']:.1f}σ")
+    if p.get("prev_state") and p.get("state"):
+        bits.append(f"{p['prev_state']}→{p['state']}")
+    if p.get("funding") is not None:
+        bits.append(f"资金费 {p['funding'] * 100:+.3f}%")
+    price = event.get("price")
+    if price:
+        bits.append(f"price={price:.2f}")
+    return head + (" · " + " · ".join(bits) if bits else "")

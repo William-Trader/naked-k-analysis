@@ -8,17 +8,22 @@
 :root{--bg:#070b12;--panel:#0d1420;--line:#1c2a3d;--text:#e8eef8;--muted:#8b9bb4;--gold:#d9b45b;--up:#ff5b6e;--down:#35d07f;--amber:#f0b35b;--blue:#5aa9ff}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#122033 0,#070b12 60%);color:var(--text);font-family:Inter,system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
-header{max-width:1240px;margin:0 auto;padding:26px 22px 8px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
-.brand{font-size:22px;letter-spacing:.18em;font-weight:700}
+header{max-width:1320px;margin:0 auto;padding:20px 22px 0;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.brand{font-size:20px;letter-spacing:.16em;font-weight:700}
 .brand span{color:var(--gold)}
-.sub{color:var(--muted);font-size:12px;margin-top:6px;letter-spacing:.08em}
+.sub{color:var(--muted);font-size:11px;margin-top:4px;letter-spacing:.08em}
 .hright{display:flex;align-items:center;gap:10px}
 .tf{display:flex;gap:4px;background:#0a111c;border:1px solid var(--line);border-radius:10px;padding:3px}
 .tf button{background:transparent;border:0;color:var(--muted);font-size:12px;font-weight:700;padding:5px 10px;border-radius:7px;cursor:pointer}
 .tf button.on{background:var(--gold);color:#0a111c}
 .live{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--down);box-shadow:0 0 12px var(--down)}
-main{max-width:1240px;margin:0 auto;padding:10px 22px 30px}
+nav.tabs{max-width:1320px;margin:16px auto 0;padding:0 22px;display:flex;gap:4px;border-bottom:1px solid var(--line)}
+nav.tabs button{background:transparent;border:0;color:var(--muted);font-size:13px;font-weight:600;padding:9px 16px;cursor:pointer;border-bottom:2px solid transparent;letter-spacing:.04em}
+nav.tabs button.on{color:var(--gold);border-bottom-color:var(--gold)}
+main{max-width:1320px;margin:0 auto;padding:16px 22px 30px}
+section.tab{display:none}
+section.tab.on{display:block}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .card{background:linear-gradient(180deg,#0f1826,#0b121d);border:1px solid var(--line);border-radius:16px;padding:16px 16px 10px;box-shadow:0 18px 50px rgba(0,0,0,.35)}
 .card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -38,28 +43,53 @@ main{max-width:1240px;margin:0 auto;padding:10px 22px 30px}
 .levels b{color:var(--gold);font-weight:600}
 .sig{margin-top:9px;border-top:1px dashed var(--line);padding-top:8px;font-size:12px;line-height:1.7}
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.04em;margin:2px 4px 0 0}
-.tools{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
-.tools button{background:#0a111c;border:1px solid var(--line);color:var(--muted);font-size:11px;padding:5px 9px;border-radius:8px;cursor:pointer}
-.tools button.on{border-color:var(--gold);color:var(--gold)}
 .chart-wrap{position:relative;margin-top:8px}
-canvas.chart{width:100%;height:340px;display:block;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}
-.ohlc{position:absolute;left:8px;top:2px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;letter-spacing:.02em}
-.ohlc b{color:var(--text);font-weight:600}
-.hint{font-size:10px;color:var(--muted);margin-top:2px}
-.events{max-width:1240px;margin:18px auto 0;padding:0 22px}
+.tv-chart{width:100%;height:360px;border-radius:8px;overflow:hidden}
+.events{max-width:1320px;margin:18px auto 0;padding:0 22px}
 .events h2{font-size:13px;letter-spacing:.14em;color:var(--muted);font-weight:600;margin:0 0 10px}
 .ev{display:flex;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#0a111c;font-size:12px}
 .ev .sev{font-weight:700;font-size:11px}
 .ev .t{color:var(--muted);font-variant-numeric:tabular-nums}
-footer{max-width:1240px;margin:0 auto;padding:18px 22px 40px;color:var(--muted);font-size:11px;line-height:1.7}
-@media(max-width:900px){.grid{grid-template-columns:1fr}canvas.chart{height:300px}}
+footer{max-width:1320px;margin:0 auto;padding:18px 22px 40px;color:var(--muted);font-size:11px;line-height:1.7}
+.kb{display:grid;grid-template-columns:280px 1fr;gap:16px}
+.kb-nav{background:linear-gradient(180deg,#0f1826,#0b121d);border:1px solid var(--line);border-radius:14px;padding:12px;align-self:start;max-height:78vh;overflow:auto;position:sticky;top:12px}
+.kb-nav h3{font-size:12px;letter-spacing:.12em;color:var(--gold);margin:0 0 8px}
+.kb-nav .mi{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--muted);font-size:12px;padding:7px 9px;border-radius:7px;cursor:pointer;line-height:1.4}
+.kb-nav .mi:hover{background:#0a111c}
+.kb-nav .mi.on{background:#0a111c;color:var(--gold)}
+.kb-doc{background:linear-gradient(180deg,#0f1826,#0b121d);border:1px solid var(--line);border-radius:14px;padding:22px 26px;font-size:14px;line-height:1.8;overflow:auto;max-height:82vh}
+.kb-doc h1{font-size:22px;color:var(--gold);border-bottom:1px solid var(--line);padding-bottom:10px}
+.kb-doc h2{font-size:17px;color:var(--text);margin-top:24px;border-left:3px solid var(--gold);padding-left:10px}
+.kb-doc h3{font-size:15px;color:var(--text);margin-top:18px}
+.kb-doc table{border-collapse:collapse;width:100%;margin:12px 0;font-size:12.5px}
+.kb-doc th,.kb-doc td{border:1px solid var(--line);padding:6px 9px;text-align:left}
+.kb-doc th{background:#0a111c;color:var(--gold)}
+.kb-doc code{background:#0a111c;border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:12px;color:var(--blue)}
+.kb-doc pre{background:#0a111c;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto}
+.kb-doc pre code{border:0;padding:0}
+.kb-doc blockquote{border-left:3px solid var(--gold);margin:10px 0;padding:6px 14px;color:var(--muted);background:#0a111c;border-radius:0 8px 8px 0}
+.kb-doc ul,.kb-doc ol{padding-left:22px}
+.kb-doc hr{border:0;border-top:1px solid var(--line);margin:20px 0}
+.params{max-width:720px}
+.pgroup{background:linear-gradient(180deg,#0f1826,#0b121d);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:14px}
+.pgroup h3{font-size:13px;letter-spacing:.08em;color:var(--gold);margin:0 0 12px}
+.prow{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.prow label{flex:0 0 200px;font-size:12px;color:var(--muted)}
+.prow input[type=range]{flex:1}
+.prow .pv{flex:0 0 64px;font-size:13px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+.prow input[type=number]{width:88px;background:#0a111c;border:1px solid var(--line);color:var(--text);border-radius:7px;padding:6px 8px;font-size:13px}
+.pactions{display:flex;gap:10px;margin-top:6px}
+.pactions button{background:var(--gold);border:0;color:#0a111c;font-weight:700;font-size:13px;padding:9px 18px;border-radius:9px;cursor:pointer}
+.pactions button.ghost{background:#0a111c;color:var(--muted);border:1px solid var(--line)}
+.note{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.6}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.kb{grid-template-columns:1fr}.kb-nav{position:static;max-height:none}}
 </style>
 </head>
 <body>
 <header>
   <div>
     <div class="brand">NAKED<span>-K</span> · 价格行为终端</div>
-    <div class="sub">PRICE ACTION TERMINAL · CANDLES · PATTERNS · TRADINGVIEW-LIKE</div>
+    <div class="sub">PRICE ACTION TERMINAL · TRADINGVIEW CHART · CANDLES · PATTERNS · KNOWLEDGE</div>
   </div>
   <div class="hright">
     <div class="tf" id="tf">
@@ -68,219 +98,68 @@ footer{max-width:1240px;margin:0 auto;padding:18px 22px 40px;color:var(--muted);
     <div class="live"><span class="dot"></span><span id="asof">加载中…</span></div>
   </div>
 </header>
-<main><div class="grid" id="grid"></div></main>
-<section class="events"><h2>EVENT FEED · 1M/5M</h2><div id="events"></div></section>
-<footer>分析工具，不构成投资建议。形态为规则候选，需结合上下文确认。滚轮缩放 · 拖拽平移 · 双击全屏 · 水平线/趋势线可画。</footer>
+<nav class="tabs" id="tabs">
+  <button data-tab="market" class="on">行情</button>
+  <button data-tab="knowledge">知识库</button>
+  <button data-tab="params">调参</button>
+</nav>
+<main>
+  <section class="tab on" id="tab-market">
+    <div class="grid" id="grid"></div>
+    <div class="events"><h2>EVENT FEED · 1M/5M</h2><div id="events"></div></div>
+  </section>
+  <section class="tab" id="tab-knowledge">
+    <div class="kb">
+      <div class="kb-nav" id="kb-nav"><h3>知识体系</h3><div id="kb-list">加载中…</div></div>
+      <div class="kb-doc" id="kb-doc"><div class="muted">从左侧选择一个模块阅读。</div></div>
+    </div>
+  </section>
+  <section class="tab" id="tab-params">
+    <div class="params" id="params-panel"></div>
+  </section>
+</main>
+<footer>分析工具，不构成投资建议。形态为规则候选，需结合上下文确认。图表由 TradingView Lightweight Charts™ 渲染。</footer>
+<script src="/vendor/lwc.js"></script>
 <script>
-var TF='4h', DATA=null, CH={};
-var C={up:'var(--up)',down:'var(--down)',neutral:'var(--muted)'};
+var TF='4h', DATA=null, CHARTS={};
+var C={up:'#ff5b6e',down:'#35d07f',neutral:'#8b9bb4',gold:'#d9b45b',blue:'#5aa9ff',amber:'#f0b35b'};
+var CB=String.fromCharCode(96); var NL=String.fromCharCode(10);
 function fmt(n,d){ if(n===null||n===undefined) return '—'; return Number(n).toLocaleString('en-US',{minimumFractionDigits:d||2,maximumFractionDigits:d||2}); }
 function pct(n){ return (n>=0?'+':'')+Number(n).toFixed(2)+'%'; }
 function col(n){ return n>=0?C.up:C.down; }
-function linesKey(sym){ return 'nk-lines-'+sym; }
-function loadLines(sym){ try{return JSON.parse(localStorage.getItem(linesKey(sym))||'[]');}catch(e){return [];} }
-function saveLines(sym,lines){ try{localStorage.setItem(linesKey(sym),JSON.stringify(lines));}catch(e){} fetch('/api/drawings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:sym,lines:lines})}).catch(function(){}); }
-function drawChart(sym){
-  var st=CH[sym]; if(!st||!st.s||!st.s.candles) return;
-  var s=st.s,c=s.candles,n=c.length;
-  var cv=document.querySelector('canvas.chart[data-sym="'+sym+'"]'); if(!cv) return;
-  var dpr=window.devicePixelRatio||1,w=cv.clientWidth||600,h=cv.clientHeight||340;
-  cv.width=w*dpr;cv.height=h*dpr;
-  var ctx=cv.getContext('2d');ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-  var padL=8,padR=64,padT=26,volH=52,padB=24;
-  var plotW=w-padL-padR,plotH=h-padT-padB-volH;
-  st.plot={l:padL,r:w-padR,t:padT,b:h-padB-volH,w:plotW,h:plotH};
-  var start=st.view.start,end=st.view.end,vis=c.slice(start,end),m=vis.length;
-  if(!m)return;
-  var lo=Math.min.apply(null,vis.map(function(x){return x.l;})),hi=Math.max.apply(null,vis.map(function(x){return x.h;}));
-  if(s.r20_lo)lo=Math.min(lo,s.r20_lo); if(s.r20_hi)hi=Math.max(hi,s.r20_hi);
-  (st.lines||[]).forEach(function(L){if(L.type==='hline'){lo=Math.min(lo,L.price);hi=Math.max(hi,L.price);}});
-  var span=(hi-lo)||1,xw=plotW/m;
-  function X(i){return padL+(i-start)*xw+xw/2;}
-  function Y(p){return padT+(hi-p)/span*plotH;}
-  function px(y){return hi-(y-padT)/plotH*span;}
-  // grid + price axis
-  ctx.strokeStyle='#162335';ctx.lineWidth=1;ctx.font='10px ui-monospace,Menlo';
-  for(var g=0;g<=4;g++){
-    var gy=padT+plotH*g/4;
-    ctx.beginPath();ctx.moveTo(padL,gy);ctx.lineTo(padL+plotW,gy);ctx.stroke();
-    ctx.fillStyle='#6f8199';ctx.fillText(fmt(hi-span*g/4,1),padL+plotW+4,gy+3);
-  }
-  // time axis
-  ctx.strokeStyle='#162335';ctx.beginPath();ctx.moveTo(padL,h-padB);ctx.lineTo(padL+plotW,h-padB);ctx.stroke();
-  ctx.fillStyle='#6f8199';
-  for(var t=0;t<=4;t++){
-    var idx=Math.min(m-1,Math.round((m-1)*t/4)),ct=c[start+idx];
-    var tx=X(start+idx);
-    var d=new Date(ct.t);
-    var lab=TF==='1d'?(d.getMonth()+1)+'/'+d.getDate():(d.getMonth()+1)+'/'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':00';
-    ctx.fillText(lab,Math.max(2,Math.min(tx-20,w-padR-36)),h-padB+14);
-  }
-  // volume
-  if(st.showVol){
-  var maxV=Math.max.apply(null,vis.map(function(x){return x.v;}))||1;
-  for(var i=0;i<m;i++){
-    var vh=vis[i].v/maxV*volH;
-    ctx.fillStyle=vis[i].c>=vis[i].o?'rgba(255,91,110,.35)':'rgba(53,208,127,.35)';
-    ctx.fillRect(X(start+i)-xw*0.32,h-padB-vh,xw*0.64,vh);
-  }
-  }
-  // candles
-  for(var i=0;i<m;i++){
-    var ci=start+i,x=X(ci),up=vis[i].c>=vis[i].o;
-    ctx.strokeStyle=up?'#ff5b6e':'#35d07f';ctx.fillStyle=ctx.strokeStyle;
-    ctx.beginPath();ctx.moveTo(x,Y(vis[i].h));ctx.lineTo(x,Y(vis[i].l));ctx.stroke();
-    var yO=Y(vis[i].o),yC=Y(vis[i].c),top=Math.min(yO,yC),bh=Math.max(1,Math.abs(yO-yC));
-    ctx.fillRect(x-xw*0.32,top,xw*0.64,bh);
-  }
-  // EMA
-  function poly(arr,color){
-    if(!arr||arr.length<2)return;
-    ctx.strokeStyle=color;ctx.lineWidth=1.3;ctx.beginPath();var first=true;
-    for(var i=start;i<end;i++){
-      var v=arr[i]; if(v===undefined)continue;
-      var x=X(i),y=Y(v);
-      if(first){ctx.moveTo(x,y);first=false;}else ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-  }
-  if(st.showEma){poly(s.ema20_series,'#d9b45b');poly(s.ema50_series,'#5aa9ff');}
-  // levels
-  function hline(p,color,label){
-    if(!p)return;var y=Y(p);
-    ctx.save();ctx.setLineDash([4,4]);ctx.strokeStyle=color;ctx.beginPath();
-    ctx.moveTo(padL,y);ctx.lineTo(padL+plotW,y);ctx.stroke();ctx.restore();
-    ctx.fillStyle=color;ctx.font='9px ui-monospace,Menlo';ctx.fillText(label+' '+fmt(p,1),padL+2,y-3);
-  }
-  hline(s.r20_lo,'#35d07f','支撑');hline(s.r20_hi,'#ff5b6e','阻力');
-  // swing marks
-  var sm=s.swing_marks||{highs:[],lows:[]};
-  ctx.font='9px ui-monospace,Menlo';
-  (sm.highs||[]).forEach(function(pt){if(pt.i>=start&&pt.i<end){var x=X(pt.i),y=Y(pt.p);ctx.fillStyle='#ff5b6e';ctx.beginPath();ctx.arc(x,y,2.4,0,6.28);ctx.fill();ctx.fillText('SH',x+3,y-3);}});
-  (sm.lows||[]).forEach(function(pt){if(pt.i>=start&&pt.i<end){var x=X(pt.i),y=Y(pt.p);ctx.fillStyle='#35d07f';ctx.beginPath();ctx.arc(x,y,2.4,0,6.28);ctx.fill();ctx.fillText('SL',x+3,y+9);}});
-  // patterns
-  (s.patterns||[]).forEach(function(pt){
-    if(pt.role==='suppressed') return;
-    if(pt.neckline){var y=Y(pt.neckline);ctx.save();ctx.setLineDash([2,4]);ctx.strokeStyle='rgba(217,180,91,.7)';ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+plotW,y);ctx.stroke();ctx.restore();}
-    if(pt.index!=null&&pt.index>=start&&pt.index<end){
-      var x=X(pt.index),y=Y(pt.price);
-      ctx.fillStyle=pt.direction==='bullish'?'#35d07f':pt.direction==='bearish'?'#ff5b6e':'#d9b45b';
-      ctx.font='9px ui-monospace,Menlo';ctx.fillText(pt.type,x+3,y-6);
-    }
+function makeChart(sym, s){
+  var el=document.getElementById('chart-'+sym); if(!el) return;
+  if(CHARTS[sym]){ try{CHARTS[sym].chart.remove();}catch(e){} }
+  if(!window.LightweightCharts){ el.textContent='图表库未加载'; return; }
+  var chart=LightweightCharts.createChart(el,{
+    layout:{background:{color:'transparent'},textColor:'#8b9bb4',fontFamily:'Inter,system-ui'},
+    grid:{vertLines:{color:'#162335'},horzLines:{color:'#162335'}},
+    rightPriceScale:{borderColor:'#1c2a3d'},
+    timeScale:{borderColor:'#1c2a3d',timeVisible:true,secondsVisible:false},
+    crosshair:{mode:0},
   });
-  // user drawings
-  (st.lines||[]).forEach(function(L){
-    ctx.save();ctx.strokeStyle='#e8eef8';ctx.lineWidth=1.2;
-    if(L.type==='hline'){var y=Y(L.price);ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+plotW,y);ctx.stroke();ctx.fillStyle='#e8eef8';ctx.font='9px ui-monospace,Menlo';ctx.fillText(fmt(L.price,1),padL+plotW+4,y+3);}
-    if(L.type==='trend'&&L.p1&&L.p2){ctx.beginPath();ctx.moveTo(X(L.p1.i),Y(L.p1.price));ctx.lineTo(X(L.p2.i),Y(L.p2.price));ctx.stroke();}
-    ctx.restore();
+  var candles=chart.addCandlestickSeries({
+    upColor:'#ff5b6e',downColor:'#35d07f',borderVisible:false,
+    wickUpColor:'#ff5b6e',wickDownColor:'#35d07f',
   });
-  // crosshair
-  if(st.hover>=start&&st.hover<end){
-    var hx=X(st.hover),cy=st.hoverY||padT;
-    ctx.save();ctx.setLineDash([3,3]);ctx.strokeStyle='#8b9bb4';
-    ctx.beginPath();ctx.moveTo(hx,padT);ctx.lineTo(hx,h-padB);ctx.stroke();
-    if(st.hoverY){ctx.beginPath();ctx.moveTo(padL,cy);ctx.lineTo(padL+plotW,cy);ctx.stroke();}
-    ctx.restore();
-    ctx.fillStyle='#0a111c';ctx.strokeStyle='#8b9bb4';
-    var pl=fmt(Y?px(cy):0,1);
-    ctx.fillRect(padL+plotW+1,cy-8,padR-2,16);ctx.strokeRect(padL+plotW+1,cy-8,padR-2,16);
-    ctx.fillStyle='#e8eef8';ctx.font='10px ui-monospace,Menlo';ctx.fillText(pl,padL+plotW+4,cy+3);
+  candles.setData((s.candles||[]).map(function(k){ return {time:k.t/1000,open:k.o,high:k.h,low:k.l,close:k.c}; }));
+  function addLine(vals,color){
+    var ln=chart.addLineSeries({color:color,lineWidth:1,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
+    var d=[];(vals||[]).forEach(function(v,i){ if(v===undefined||v===null)return; d.push({time:s.candles[i].t/1000,value:v}); });
+    ln.setData(d);
   }
-  // legend
-  var ci=(st.hover>=0&&st.hover<n)?st.hover:n-1;
-  var cc=c[ci],chg=cc.o?((cc.c-cc.o)/cc.o*100):0;
-  var el=document.getElementById('ohlc-'+sym);
-  if(el) el.innerHTML='<b>'+sym.replace('USDT','')+'</b> · '+TF+'  O '+fmt(cc.o,1)+'  H '+fmt(cc.h,1)+'  L '+fmt(cc.l,1)+'  C '+fmt(cc.c,1)+'  <span style="color:'+col(chg)+'">'+pct(chg)+'</span>  VOL '+fmt(cc.v,0);
-}
-function setView(sym,start,end){var st=CH[sym];if(!st)return;var n=st.s.candles.length;var cnt=Math.max(20,Math.min(n,end-start));start=Math.max(0,Math.min(n-cnt,start));st.view={start:start,end:start+cnt};drawChart(sym);}
-function bind(sym){
-  var st=CH[sym],cv=document.querySelector('canvas.chart[data-sym="'+sym+'"]');
-  if(!cv)return;
-  cv.addEventListener('wheel',function(e){
-    e.preventDefault();
-    var r=cv.getBoundingClientRect(),x=e.clientX-r.left;
-    var p=st.plot||{l:8,w:r.width-72};var ratio=Math.max(0,Math.min(1,(x-p.l)/p.w));
-    var cnt=st.view.end-st.view.start,newCnt=Math.round(cnt*(e.deltaY>0?1.15:0.87));
-    newCnt=Math.max(20,Math.min(st.s.candles.length,newCnt));
-    var center=st.view.start+ratio*cnt,ns=Math.round(center-ratio*newCnt);
-    setView(sym,ns,ns+newCnt);
-  },{passive:false});
-  var drag=null;
-  cv.addEventListener('mousedown',function(e){
-    if(st.mode==='none'){drag={x:e.clientX,view:Object.assign({},st.view)};}
-  });
-  window.addEventListener('mouseup',function(){drag=null;});
-  cv.addEventListener('mousemove',function(e){
-    var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
-    if(drag){
-      var p=st.plot,d=(drag.x-e.clientX)/p.w*(drag.view.end-drag.view.start);
-      setView(sym,drag.view.start+Math.round(d),drag.view.end+Math.round(d));
-      return;
-    }
-    var p=st.plot||{l:8,w:r.width-72};
-    var ratio=Math.max(0,Math.min(1,(x-p.l)/p.w));
-    st.hover=Math.min(st.s.candles.length-1,st.view.start+Math.floor(ratio*(st.view.end-st.view.start)));
-    st.hoverY=y;
-    if(!st.raf){st.raf=true;requestAnimationFrame(function(){st.raf=false;drawChart(sym);});}
-  });
-  cv.addEventListener('mouseleave',function(){st.hover=-1;st.hoverY=null;drawChart(sym);});
-  cv.addEventListener('click',function(e){
-    if(st.mode==='none')return;
-    var r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
-    var p=st.plot;var ratio=Math.max(0,Math.min(1,(x-p.l)/p.w));
-    var idx=st.view.start+Math.floor(ratio*(st.view.end-st.view.start));
-    var price=null;
-    if(p&&p.h){var lo=Math.min.apply(null,st.s.candles.slice(st.view.start,st.view.end).map(function(z){return z.l;}));var hi=Math.max.apply(null,st.s.candles.slice(st.view.start,st.view.end).map(function(z){return z.h;}));price=hi-(y-p.t)/p.h*(hi-lo);}
-    if(st.mode==='hline'&&price){st.lines.push({type:'hline',price:price});saveLines(sym,st.lines);st.mode='none';syncTools(sym);drawChart(sym);}
-    if(st.mode==='trend'&&price){
-      if(!st.p1){st.p1={i:idx,price:price};}
-      else{st.lines.push({type:'trend',p1:st.p1,p2:{i:idx,price:price}});st.p1=null;saveLines(sym,st.lines);st.mode='none';syncTools(sym);drawChart(sym);}
-    }
-  });
-  var tch=null;
-  function mid(t){return (t[0].clientX+t[1].clientX)/2;}
-  function tdist(t){var dx=t[0].clientX-t[1].clientX,dy=t[0].clientY-t[1].clientY;return Math.sqrt(dx*dx+dy*dy)||1;}
-  cv.addEventListener('touchstart',function(e){
-    var r=cv.getBoundingClientRect();
-    if(e.touches.length===2){tch={mode:'pinch',d:tdist(e.touches),view:Object.assign({},st.view),x:mid(e.touches)-r.left};e.preventDefault();}
-    else if(e.touches.length===1){tch={mode:'pan',x:e.touches[0].clientX,view:Object.assign({},st.view),moved:0};}
-  },{passive:false});
-  cv.addEventListener('touchmove',function(e){
-    if(!tch)return;e.preventDefault();
-    var r=cv.getBoundingClientRect();
-    if(tch.mode==='pinch'&&e.touches.length===2){
-      var pp=st.plot||{l:8,w:r.width-72};
-      var ratio=tch.d/tdist(e.touches);
-      var cnt=tch.view.end-tch.view.start,newCnt=Math.max(20,Math.min(st.s.candles.length,Math.round(cnt*ratio)));
-      var rr=Math.max(0,Math.min(1,(tch.x-pp.l)/pp.w));
-      var center=tch.view.start+rr*cnt,ns=Math.round(center-rr*newCnt);
-      setView(sym,ns,ns+newCnt);
-      return;
-    }
-    if(tch.mode==='pan'&&e.touches.length===1){
-      var pl=st.plot,d0=(tch.x-e.touches[0].clientX)/pl.w*(tch.view.end-tch.view.start);
-      tch.moved=Math.max(tch.moved,Math.abs(e.touches[0].clientX-tch.x));
-      setView(sym,tch.view.start+Math.round(d0),tch.view.end+Math.round(d0));
-    }
-  },{passive:false});
-  cv.addEventListener('touchend',function(e){
-    if(tch&&tch.mode==='pan'&&tch.moved<8&&e.touches.length===0){
-      var r2=cv.getBoundingClientRect(),x2=tch.x-r2.left;
-      var p2=st.plot||{l:8,w:r2.width-72};
-      var ra=Math.max(0,Math.min(1,(x2-p2.l)/p2.w));
-      st.hover=Math.min(st.s.candles.length-1,st.view.start+Math.floor(ra*(st.view.end-st.view.start)));
-      st.hoverY=null;drawChart(sym);
-    }
-    if(e.touches.length===0){tch=null;}
-    else if(e.touches.length===1&&tch){tch={mode:'pan',x:e.touches[0].clientX,view:Object.assign({},st.view),moved:0};}
-  },{passive:false});
-  cv.addEventListener('dblclick',function(){var card=cv.closest('.card');if(card&&card.requestFullscreen)card.requestFullscreen();});
-}
-function syncTools(sym){
-  var card=document.querySelector('canvas.chart[data-sym="'+sym+'"]');
-  if(!card)return;var st=CH[sym];
-  card.closest('.card').querySelectorAll('[data-mode]').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-mode')===st.mode);});
+  addLine(s.ema20_series,C.gold); addLine(s.ema50_series,C.blue);
+  function hline(p,color,label){ if(p===null||p===undefined)return; candles.createPriceLine({price:p,color:color,lineWidth:1,lineStyle:2,axisLabelVisible:true,title:label}); }
+  hline(s.r20_lo,C.down,'支撑'); hline(s.r20_hi,C.up,'阻力');
+  function marks(arr,dir){
+    var out=[];(arr||[]).forEach(function(pt){ if(pt.i>=0&&pt.i<s.candles.length){ out.push({time:s.candles[pt.i].t/1000,position:dir,color:dir==='aboveBar'?C.down:C.up,shape:dir==='aboveBar'?'arrowDown':'arrowUp',text:dir==='aboveBar'?'SH':'SL'}); } });
+    return out;
+  }
+  candles.setMarkers(marks(s.swing_marks&&s.swing_marks.highs,'aboveBar').concat(marks(s.swing_marks&&s.swing_marks.lows,'belowBar')));
+  var pm=[];(s.patterns||[]).forEach(function(pt){ if(pt.role==='suppressed')return; if(pt.index!=null&&pt.index>=0&&pt.index<s.candles.length){ var pos=pt.direction==='bullish'?'belowBar':pt.direction==='bearish'?'aboveBar':'belowBar'; pm.push({time:s.candles[pt.index].t/1000,position:pos,color:pt.direction==='bullish'?C.down:pt.direction==='bearish'?C.up:C.gold,shape:'circle',text:pt.type}); } });
+  candles.setMarkers(pm);
+  chart.timeScale().fitContent();
+  CHARTS[sym]={chart:chart};
 }
 function card(sym,s){
   var tr=s.trend||{},st=s.stance||{},dir=st.direction||'neutral';
@@ -290,7 +169,13 @@ function card(sym,s){
   var barTxt='BAR '+(bp.type||'—')+' q'+(bp.quality==null?'—':bp.quality);
   var sbTxt=(sb.score==null)?'':' · 信号K '+sb.score;
   var sc=tr.score||50,label=tr.label||'neutral',ai=tr.always_in||'neutral';
-  function pstate(t,d){var a=s.pattern_states||[];for(var i=0;i<a.length;i++){if(a[i].type===t&&a[i].direction===d)return a[i].status;}return '';}var prim=s.primary_pattern,sec=s.secondary_pattern;var pats='';if(prim){var c=prim.direction==='bullish'?'var(--up)':prim.direction==='bearish'?'var(--down)':'var(--gold)';var pst=pstate(prim.type,prim.direction);pats+='<span class="pill" style="color:'+c+';border:1px solid '+c+'">主：'+prim.label+' · '+prim.quality+(pst?' · '+pst:'')+'</span>';}if(sec){var c2=sec.direction==='bullish'?'var(--up)':sec.direction==='bearish'?'var(--down)':'var(--gold)';var sst=pstate(sec.type,sec.direction);pats+='<span class="pill" style="color:'+c2+';border:1px solid '+c2+'">备：'+sec.label+' · '+sec.quality+(sst?' · '+sst:'')+'</span>';}var sup=(s.patterns||[]).filter(function(x){return x.role==='suppressed';}).length;if(!prim)pats='<span class="muted" style="font-size:11px">无标准形态</span>';pats+='<span class="muted" style="font-size:10px"> · 上下文 '+(s.pattern_context||'—')+' · 过滤 '+sup+' 个</span>';
+  function pstate(t,d){var a=s.pattern_states||[];for(var i=0;i<a.length;i++){if(a[i].type===t&&a[i].direction===d)return a[i].status;}return '';}
+  var prim=s.primary_pattern,sec=s.secondary_pattern;var pats='';
+  if(prim){var c=prim.direction==='bullish'?C.up:prim.direction==='bearish'?C.down:C.gold;var pst=pstate(prim.type,prim.direction);pats+='<span class="pill" style="color:'+c+';border:1px solid '+c+'">主：'+prim.label+' · '+prim.quality+(pst?' · '+pst:'')+'</span>';}
+  if(sec){var c2=sec.direction==='bullish'?C.up:sec.direction==='bearish'?C.down:C.gold;var sst=pstate(sec.type,sec.direction);pats+='<span class="pill" style="color:'+c2+';border:1px solid '+c2+'">备：'+sec.label+' · '+sec.quality+(sst?' · '+sst:'')+'</span>';}
+  var sup=(s.patterns||[]).filter(function(x){return x.role==='suppressed';}).length;
+  if(!prim)pats='<span class="muted" style="font-size:11px">无标准形态</span>';
+  pats+='<span class="muted" style="font-size:10px"> · 上下文 '+(s.pattern_context||'—')+' · 过滤 '+sup+' 个</span>';
   var sig='方向 <span class="pill" style="color:'+C[dir]+';border:1px solid '+C[dir]+'">'+dir+'</span> · 置信度 <b>'+(st.confidence||'—')+'</b>';
   if(st.entry)sig+=' · entry <b>'+fmt(st.entry,1)+'</b> · stop <b>'+fmt(st.stop,1)+'</b> · target <b>'+fmt(st.target,1)+'</b>';
   return '<article class="card">'
@@ -306,45 +191,20 @@ function card(sym,s){
     +'<div class="levels">'+mtfTxt+' · '+stTxt+' · '+barTxt+sbTxt+'</div>'
     +'<div class="sig">'+sig+'</div>'
     +'<div style="margin-top:7px;font-size:11px;color:var(--muted)">结构：'+(s.structure||'—')+' · 形态：'+pats+'</div>'
-    +'<div class="tools"><button data-ind="ema" class="on">EMA</button><button data-ind="vol" class="on">VOL</button><button data-mode="hline">水平线</button><button data-mode="trend">趋势线</button><button data-mode="clear">清除画线</button><button data-full="1">全屏</button></div>'
-    +'<div class="chart-wrap"><div class="ohlc" id="ohlc-'+sym+'"></div><canvas class="chart" data-sym="'+sym+'"></canvas></div>'
-    +'<div class="hint">滚轮缩放 · 拖拽平移 · 双击全屏 · 十字线 OHLC</div>'
+    +'<div class="chart-wrap"><div class="tv-chart" id="chart-'+sym+'"></div></div>'
     +'</article>';
 }
 function render(){
   if(!DATA)return;
   var g=document.getElementById('grid');var keys=Object.keys(DATA.symbols||{});
   g.innerHTML=keys.map(function(k){return card(k,DATA.symbols[k]);}).join('');
-  keys.forEach(function(sym){
-    var s=DATA.symbols[sym],n=s.candles.length;
-    CH[sym]={s:s,view:{start:Math.max(0,n-80),end:n},hover:-1,hoverY:null,mode:'none',p1:null,lines:loadLines(sym),showEma:true,showVol:true};
-    bind(sym);drawChart(sym);
-    fetch('/api/drawings?symbol='+sym).then(function(r){return r.json();}).then(function(lines){if(lines&&lines.length){CH[sym].lines=lines;drawChart(sym);}}).catch(function(){});
-    var root=document.querySelector('canvas.chart[data-sym="'+sym+'"]').closest('.card');
-    root.querySelectorAll('[data-mode]').forEach(function(b){
-      b.addEventListener('click',function(){
-        var m=b.getAttribute('data-mode');
-        if(m==='clear'){CH[sym].lines=[];saveLines(sym,[]);CH[sym].mode='none';syncTools(sym);drawChart(sym);return;}
-        CH[sym].mode=(CH[sym].mode===m?'none':m);CH[sym].p1=null;syncTools(sym);
-      });
-    });
-    root.querySelectorAll('[data-ind]').forEach(function(b){
-      b.addEventListener('click',function(){
-        var k=b.getAttribute('data-ind');
-        if(k==='ema')CH[sym].showEma=!CH[sym].showEma;
-        if(k==='vol')CH[sym].showVol=!CH[sym].showVol;
-        b.classList.toggle('on',k==='ema'?CH[sym].showEma:CH[sym].showVol);
-        drawChart(sym);
-      });
-    });
-    root.querySelector('[data-full]').addEventListener('click',function(){if(root.requestFullscreen)root.requestFullscreen();});
-  });
-  var first=Object.keys(DATA.symbols||{})[0];var dts=first?DATA.symbols[first].data_ts:DATA.as_of;
+  keys.forEach(function(sym){ makeChart(sym,DATA.symbols[sym]); });
+  var first=keys[0];var dts=first?DATA.symbols[first].data_ts:DATA.as_of;
   document.getElementById('asof').textContent='数据 '+new Date(dts).toLocaleString('zh-CN',{hour12:false})+' · Binance · '+TF;
   var ev=document.getElementById('events');
   ev.innerHTML=(DATA.events||[]).slice(0,30).map(function(e){
     var t=new Date(e.ts).toLocaleString('zh-CN',{hour12:false});
-    var c=e.severity==='P0'?'var(--up)':e.severity==='P1'?'var(--amber)':'var(--muted)';
+    var c=e.severity==='P0'?C.up:e.severity==='P1'?C.amber:C.muted;
     return '<div class="ev"><span class="sev" style="color:'+c+'">'+e.severity+'</span><span class="t">'+t+'</span><span>'+e.symbol+' · '+e.kind+'</span><span class="muted">'+fmt(e.price,1)+'</span></div>';
   }).join('')||'<div class="ev muted">暂无事件</div>';
 }
@@ -353,8 +213,136 @@ async function load(tf){
   try{var r=await fetch('/api/overview?interval='+tf);DATA=await r.json();render();}
   catch(e){document.getElementById('asof').textContent='数据源异常';}
 }
-window.addEventListener('resize',function(){Object.keys(CH).forEach(function(k){drawChart(k);});});
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function mdToHtml(src){
+  var lines=src.split(NL),out=[],inCode=false,codeBuf=[],tbl=[],inTable=false;
+  function flushTable(){
+    if(!tbl.length)return;
+    var html='<table>';var rows=tbl.map(function(r){return r.split('|').slice(1,-1).map(function(c){return c.trim();});});
+    rows.forEach(function(r,i){ var tag=i===0?'th':'td'; html+='<tr>'+r.map(function(c){return '<'+tag+'>'+inline(c)+'</'+tag+'>';}).join('')+'</tr>'; });
+    html+='</table>';out.push(html);tbl=[];inTable=false;
+  }
+  function inline(s){
+    s=esc(s);
+    s=s.replace(new RegExp(CB+'([^'+CB+']+)'+CB,'g'),'<code>$1</code>');
+    s=s.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+    return s;
+  }
+  for(var i=0;i<lines.length;i++){
+    var ln=lines[i];
+    if(ln.trim().startsWith(CB+CB+CB)){ if(inCode){out.push('<pre><code>'+esc(codeBuf.join(NL))+'</code></pre>');codeBuf=[];} inCode=!inCode; continue; }
+    if(inCode){codeBuf.push(ln);continue;}
+    if(ln.trim().startsWith('|')&&ln.trim().endsWith('|')){ if(!inTable)tbl=[]; tbl.push(ln); inTable=true; if(i===lines.length-1)flushTable(); continue; }
+    else if(inTable){ flushTable(); }
+    if(/^#{1,4}\s/.test(ln)){ var h=ln.match(/^(#{1,4})\s(.*)/); var lv=h[1].length; out.push('<h'+lv+'>'+inline(h[2])+'</h'+lv+'>'); continue; }
+    if(/^\s*[-*]\s/.test(ln)){ out.push('<li>'+inline(ln.replace(/^\s*[-*]\s/,''))+'</li>'); continue; }
+    if(/^\s*\d+\.\s/.test(ln)){ out.push('<li>'+inline(ln.replace(/^\s*\d+\.\s/,''))+'</li>'); continue; }
+    if(ln.trim().startsWith('>')){ out.push('<blockquote>'+inline(ln.replace(/^\s*>\s?/,''))+'</blockquote>'); continue; }
+    if(/^---+$/.test(ln.trim())){ out.push('<hr>'); continue; }
+    if(ln.trim()==='')continue;
+    out.push('<p>'+inline(ln)+'</p>');
+  }
+  return out.join(NL);
+}
+async function loadKbList(){
+  try{
+    var r=await fetch('/api/knowledge');var d=await r.json();
+    var list=document.getElementById('kb-list');
+    if(!d.modules){list.textContent='加载失败';return;}
+    list.innerHTML=d.modules.map(function(m){
+      return '<button class="mi" data-file="'+m.file+'"><b>'+esc(m.file.replace('.md',''))+'</b><br>'+esc(m.title)+'</button>';
+    }).join('');
+    list.querySelectorAll('.mi').forEach(function(b){
+      b.addEventListener('click',function(){
+        list.querySelectorAll('.mi').forEach(function(x){x.classList.remove('on');});
+        b.classList.add('on');loadKbDoc(b.getAttribute('data-file'));
+      });
+    });
+  }catch(e){document.getElementById('kb-list').textContent='加载失败';}
+}
+async function loadKbDoc(file){
+  try{
+    var r=await fetch('/api/knowledge?file='+encodeURIComponent(file));var d=await r.json();
+    var doc=document.getElementById('kb-doc');
+    if(d.error){doc.innerHTML='<div class="muted">'+esc(d.error)+'</div>';return;}
+    doc.innerHTML=mdToHtml(d.content);
+    doc.scrollTop=0;
+  }catch(e){document.getElementById('kb-doc').innerHTML='<div class="muted">加载失败</div>';}
+}
+var PARAM_META=[
+  {g:'方向判定（stance）',keys:[
+    ['stance_adx_trend','ADX 趋势门槛',0,60,1],
+    ['stance_pos_short','禁止做空位置下限',0,0.5,0.02],
+    ['stance_pos_long','禁止做多位置上限',0.5,1,0.02],
+    ['stance_stop_atr','止损 ATR 倍数',0.5,4,0.1],
+    ['stance_target_atr','目标 ATR 倍数',1,6,0.1],
+  ]},
+  {g:'趋势标签（trend）',keys:[
+    ['trend_adx_trend','趋势评分 ADX 门槛',0,60,1],
+    ['trend_label_up','看多阈值',50,90,1],
+    ['trend_label_down','看空阈值',10,50,1],
+    ['trend_label_strong_up','强多阈值',60,95,1],
+    ['trend_label_strong_down','强空阈值',5,40,1],
+  ]},
+  {g:'信号K（signal bar）',keys:[
+    ['signalbar_min_quality','最低信号K质量',0,100,1],
+  ]},
+];
+function loadParams(){
+  fetch('/api/params').then(function(r){return r.json();}).then(function(p){renderParams(p);}).catch(function(){});
+}
+function renderParams(p){
+  var panel=document.getElementById('params-panel');
+  var html='';
+  PARAM_META.forEach(function(g){
+    html+='<div class="pgroup"><h3>'+g.g+'</h3>';
+    g.keys.forEach(function(k){
+      var key=k[0],lab=k[1],lo=k[2],hi=k[3],step=k[4],val=p[key];
+      html+='<div class="prow"><label>'+lab+'</label>'
+        +'<input type="range" min="'+lo+'" max="'+hi+'" step="'+step+'" value="'+val+'" data-key="'+key+'">'
+        +'<input type="number" value="'+val+'" data-num="'+key+'" step="'+step+'">'
+        +'<span class="pv" data-val="'+key+'">'+val+'</span></div>';
+    });
+    html+='</div>';
+  });
+  html+='<div class="pactions"><button id="save-params">保存并应用</button><button class="ghost" id="reset-params">恢复默认</button></div>'
+    +'<div class="note">调参即时生效于 stance / trend 判定与信号K质量门槛。保存后写入 state/params.json，重启后仍生效。默认值即历史行为。</div>';
+  panel.innerHTML=html;
+  panel.querySelectorAll('input[type=range]').forEach(function(s){
+    s.addEventListener('input',function(){
+      var key=s.getAttribute('data-key');var v=parseFloat(s.value);
+      var nv=panel.querySelector('input[data-num="'+key+'"]');if(nv)nv.value=v;
+      var sp=panel.querySelector('span[data-val="'+key+'"]');if(sp)sp.textContent=v;
+    });
+  });
+  panel.querySelectorAll('input[type=number]').forEach(function(n){
+    n.addEventListener('change',function(){
+      var key=n.getAttribute('data-num');var v=parseFloat(n.value);if(isNaN(v))return;
+      var sl=panel.querySelector('input[data-key="'+key+'"]');if(sl){sl.value=v;}
+      var sp=panel.querySelector('span[data-val="'+key+'"]');if(sp)sp.textContent=v;
+    });
+  });
+  document.getElementById('save-params').addEventListener('click',function(){
+    var payload={};
+    panel.querySelectorAll('input[data-key]').forEach(function(s){payload[s.getAttribute('data-key')]=parseFloat(s.value);});
+    fetch('/api/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(function(){load(TF);}).catch(function(){});
+  });
+  document.getElementById('reset-params').addEventListener('click',function(){
+    fetch('/api/params',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})}).then(function(){load(TF);}).catch(function(){});
+  });
+}
+document.querySelectorAll('#tabs button').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('#tabs button').forEach(function(x){x.classList.remove('on');});
+    document.querySelectorAll('section.tab').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    document.getElementById('tab-'+b.getAttribute('data-tab')).classList.add('on');
+    if(b.getAttribute('data-tab')==='knowledge'&&!window._kbLoaded){window._kbLoaded=true;loadKbList();}
+    if(b.getAttribute('data-tab')==='params')loadParams();
+  });
+});
 document.querySelectorAll('#tf button').forEach(function(b){b.addEventListener('click',function(){load(b.getAttribute('data-tf'));});});
+window.addEventListener('resize',function(){ Object.keys(CHARTS).forEach(function(k){try{CHARTS[k].chart.applyOptions({width:document.getElementById('chart-'+k).clientWidth});}catch(e){}}); });
 load('4h');
 setInterval(function(){ if(!document.hidden) load(TF); },60000);
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) load(TF); });

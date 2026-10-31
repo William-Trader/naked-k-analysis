@@ -24,8 +24,19 @@ def _round(x, nd=2):
     return None if x is None else round(float(x), nd)
 
 
-def stance(f: dict) -> dict:
-    """Return direction/confidence/levels from a feature dict."""
+def stance(f: dict, params: dict | None = None) -> dict:
+    """Return direction/confidence/levels from a feature dict.
+
+    params: optional override dict (see nakedk.params.DEFAULTS). Absent keys
+    fall back to the historical defaults, so existing callers are unaffected.
+    """
+    p = params or {}
+    adx_trend = p.get("stance_adx_trend", 20.0)
+    pos_short = p.get("stance_pos_short", 0.30)
+    pos_long = p.get("stance_pos_long", 0.70)
+    stop_atr = p.get("stance_stop_atr", 1.5)
+    target_atr = p.get("stance_target_atr", 3.0)
+
     price = f["price"]
     adx = f.get("adx14") or 0.0
     rsi = f.get("rsi14") or 50.0
@@ -39,24 +50,24 @@ def stance(f: dict) -> dict:
 
     if atr is None or e20 is None or e50 is None or pos20 is None:
         reasons.append("insufficient feature set")
-    elif adx < 20:
-        reasons.append(f"ADX {adx:.1f} < 20: no trend edge")
-    elif pos20 < 0.30:
+    elif adx < adx_trend:
+        reasons.append(f"ADX {adx:.1f} < {adx_trend:g}: no trend edge")
+    elif pos20 < pos_short:
         # Never short the bottom of the range.
         if price > e20 and rsi < 45:
             direction = "long"
             confidence = 55
             reasons.append("range-low mean reversion: price above EMA20, RSI < 45")
         else:
-            reasons.append(f"pos20 {pos20:.2f} < 0.30: shorting is disabled")
-    elif pos20 > 0.70:
+            reasons.append(f"pos20 {pos20:.2f} < {pos_short:g}: shorting is disabled")
+    elif pos20 > pos_long:
         # Never buy the top of the range.
         if price < e20 and rsi > 55:
             direction = "short"
             confidence = 55
             reasons.append("range-high mean reversion: price below EMA20, RSI > 55")
         else:
-            reasons.append(f"pos20 {pos20:.2f} > 0.70: buying is disabled")
+            reasons.append(f"pos20 {pos20:.2f} > {pos_long:g}: buying is disabled")
     elif e20 > e50 and price > e20:
         direction = "long"
         confidence = 56 if adx < 25 else 58
@@ -70,11 +81,11 @@ def stance(f: dict) -> dict:
 
     if atr:
         if direction == "long":
-            stop = price - 1.5 * atr
-            target = price + 3.0 * atr
+            stop = price - stop_atr * atr
+            target = price + target_atr * atr
         elif direction == "short":
-            stop = price + 1.5 * atr
-            target = price - 3.0 * atr
+            stop = price + stop_atr * atr
+            target = price - target_atr * atr
         else:
             stop = target = None
     else:

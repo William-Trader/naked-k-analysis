@@ -57,8 +57,10 @@ class TestDetect(unittest.TestCase):
 
     def test_alert_text_contains_price(self):
         ev = detect_events("BTCUSDT", feat(), 1090.0, 1000.0, 0.0)[0]
-        self.assertIn("BTCUSDT", alert_text(ev))
-        self.assertIn("price=", alert_text(ev))
+        text = alert_text(ev)
+        self.assertIn("BTC", text)
+        self.assertIn("price=", text)
+        self.assertIn("需要立刻看", text)  # +9% is extreme (P0)
 
 
 if __name__ == "__main__":

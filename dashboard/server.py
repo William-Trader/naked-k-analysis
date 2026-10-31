@@ -23,8 +23,10 @@ from nakedk.volume import vpoc
 from nakedk.location import atr_distance, edge_zone, session_levels
 from nakedk.signalbar import score as signalbar_score
 from nakedk.regime import arbitrate as arbitrate_regime
+from nakedk.params import load as load_params, save as save_params
 
 DB = os.environ.get("BEAGLE_DB", "/opt/naked-k-analysis/beagle.db")
+KB_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "knowledge")
 DRAWINGS = os.path.join(os.path.dirname(__file__), "..", "drawings.json")
 PATTERN_DB = os.environ.get("NK_PATTERN_DB", os.path.join(os.path.dirname(__file__), "..", "patterns.db"))
 TOKEN = os.environ.get("NK_DASH_TOKEN", "")
@@ -85,8 +87,9 @@ def build(interval="4h"):
     c = _cache.get(interval)
     if c and now - c["ts"] < CACHE_TTL * 1000:
         return c["data"]
+    params = load_params()
     out = {"as_of": now, "interval": interval, "symbols": {},
-           "events": [], "alerts": []}
+           "events": [], "alerts": [], "params": params}
     for sym in ("BTCUSDT", "ETHUSDT"):
         t = ticker(sym)
         ks = klines(sym, interval, 200)
@@ -97,8 +100,8 @@ def build(interval="4h"):
         except Exception:
             mtf = {"by_tf": {"1d": 0, "4h": 0, "1h": 0}, "alignment": 0, "label": "unknown"}
         f["mtf_alignment"] = mtf["alignment"]
-        st = stance(f)
-        ts = trend_score(f)
+        st = stance(f, params)
+        ts = trend_score(f, params)
         closes = [float(r[4]) for r in ks]
         e20 = ema_series(closes, 20)
         e50 = ema_series(closes, 50)
@@ -183,6 +186,32 @@ def build(interval="4h"):
     return out
 
 
+def _knowledge(file: str):
+    """List knowledge modules, or return one module's raw markdown."""
+    if file:
+        name = os.path.basename(file)
+        if not name.endswith(".md"):
+            return {"error": "bad file"}
+        p = os.path.join(KB_DIR, name)
+        try:
+            with open(p, encoding="utf-8") as fh:
+                return {"file": name, "content": fh.read()}
+        except Exception as e:
+            return {"error": str(e)[:200]}
+    items = []
+    try:
+        for name in sorted(os.listdir(KB_DIR)):
+            if name.endswith(".md"):
+                p = os.path.join(KB_DIR, name)
+                with open(p, encoding="utf-8") as fh:
+                    head = fh.readline().strip().lstrip("#").strip()
+                items.append({"file": name, "title": head,
+                              "bytes": os.path.getsize(p)})
+    except Exception as e:
+        return {"error": str(e)[:200]}
+    return {"modules": items}
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, body, ctype):
         gz = (len(body) > 1024
@@ -217,6 +246,15 @@ class Handler(BaseHTTPRequestHandler):
         if urlparse(self.path).path == "/api/drawings":
             sym = (q.get("symbol") or [""])[0]
             self._send(json.dumps(load_drawings().get(sym, []), ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8")
+            return
+        if urlparse(self.path).path == "/api/params":
+            self._send(json.dumps(load_params(), ensure_ascii=False).encode("utf-8"),
+                       "application/json; charset=utf-8")
+            return
+        if urlparse(self.path).path == "/api/knowledge":
+            self._send(json.dumps(_knowledge((q.get("file") or [""])[0]),
+                                   ensure_ascii=False).encode("utf-8"),
                        "application/json; charset=utf-8")
             return
         if urlparse(self.path).path == "/api/review":
@@ -257,6 +295,18 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps(build(interval), ensure_ascii=False).encode("utf-8"),
                        "application/json; charset=utf-8")
             return
+        # serve static assets (vendor JS) if present, else the SPA shell
+        req_path = urlparse(self.path).path
+        if req_path.startswith("/vendor/") or req_path.endswith((".js", ".css", ".png", ".svg", ".ico", ".map")):
+            rel = req_path.lstrip("/")
+            fp = os.path.join(os.path.dirname(__file__), rel)
+            if os.path.isfile(fp):
+                ctype = "text/javascript; charset=utf-8" if rel.endswith(".js") else \
+                        "text/css; charset=utf-8" if rel.endswith(".css") else \
+                        "application/octet-stream"
+                with open(fp, "rb") as fh:
+                    self._send(fh.read(), ctype)
+                return
         path = os.path.join(os.path.dirname(__file__), "index.html")
         with open(path, "rb") as fh:
             self._send(fh.read(), "text/html; charset=utf-8")
@@ -269,7 +319,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"unauthorized")
             return
-        if urlparse(self.path).path != "/api/drawings":
+        path = urlparse(self.path).path
+        if path not in ("/api/drawings", "/api/params"):
             self.send_response(404)
             self.end_headers()
             return
@@ -277,8 +328,12 @@ class Handler(BaseHTTPRequestHandler):
         raw = self.rfile.read(n).decode("utf-8")
         try:
             body = json.loads(raw)
-            save_drawings(body["symbol"], body.get("lines", []))
-            self._send(b'{"ok":true}', "application/json")
+            if path == "/api/params":
+                self._send(json.dumps(save_params(body), ensure_ascii=False).encode("utf-8"),
+                           "application/json; charset=utf-8")
+            else:
+                save_drawings(body["symbol"], body.get("lines", []))
+                self._send(b'{"ok":true}', "application/json")
         except Exception as e:
             self.send_response(400)
             self.end_headers()
