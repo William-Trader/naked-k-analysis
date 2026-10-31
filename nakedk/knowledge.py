@@ -71,13 +71,19 @@ def search(query: str, limit: int = 8):
                 lines = fh.read().splitlines()
         except Exception:
             continue
-        distinct = 0
+        # a word matching the filename or a heading (title) is a stronger hit
+        # than a body-only match: boost it so dedicated modules rank first.
+        title = name.lower()
+        headings = "\n".join(
+            ln for ln in lines[:20] if ln.strip().startswith("#"))
+        title_zone = (title + "\n" + headings).lower()
+        score = 0
         for w in words:
             if any(w in ln.lower() for ln in lines):
-                distinct += 1
-        if not distinct:
+                score += 3 if w in title_zone else 1
+        if not score:
             continue
-        # collect matching lines
+        # collect matching lines (title-zone lines first)
         hits = []
         for ln in lines:
             n = sum(1 for w in words if w in ln.lower())
@@ -86,7 +92,7 @@ def search(query: str, limit: int = 8):
         hits.sort(key=lambda x: -x[0])
         results.append({
             "file": name,
-            "score": distinct,
+            "score": score,
             "top": [{"line": ln} for _n, ln in hits[:2]],
         })
     results.sort(key=lambda r: -r["score"])

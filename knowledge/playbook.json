@@ -23,8 +23,20 @@
     "ADX < 20 forbids trend direction",
     "no 24h directional forecast",
     "no fabricated probability percentages",
-    "must provide trigger, invalidation, target"
+    "must provide trigger, invalidation, target",
+    "trade only if (win_prob x reward) > (loss_prob x risk)",
+    "likely requires probability >= 60%",
+    "risk > reward requires 70% win rate else swing",
+    "swing reward >= 2x risk; scalp win rate 60-90%",
+    "position size from stop distance, not the reverse"
   ],
+  "trader_equation": {
+    "formula": "(win_probability x reward) > (loss_probability x risk)",
+    "likely_threshold": 0.60,
+    "risk_gt_reward_breakeven_winrate": 0.70,
+    "swing_min_reward_multiple": 2.0,
+    "scalp_winrate_range": [0.60, 0.90]
+  },
   "scoring": {
     "higher_timeframe_alignment": 20,
     "location": 20,

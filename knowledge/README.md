@@ -13,6 +13,9 @@
 | 07-ocr-distilled.md | 扫描书 OCR 提纯：崔海军/胡云生/许佳聪（异动、相对强弱、支撑质量、入场止损） |
 | 08-albrooks-deep.md | Al Brooks 深度框架：周期/Always-In/Setup/概率/管理/12问 |
 | 09-review-rubric.md | 输出评审标准（12项×5分=60） |
+| 10-albrooks-taxonomy.md | Al Brooks 术语全集与引擎映射 |
+| 11-risk-management.md | 交易者方程、止损、实际风险、订单类型（Video 30/32/33/34） |
+| 12-swing-scalp.md | 波段 vs 剥头皮的量化画像 + 程序化交易认知（Video 31/5） |
 | playbook.json | 机器可读的规则/权重摘要 |
 
 ## 使用方式
