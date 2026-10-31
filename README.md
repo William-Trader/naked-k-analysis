@@ -17,7 +17,7 @@ Zero-dependency price-action analysis and multi-frequency monitoring for crypto 
 
 ## 关于本项目 / About
 
-naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸馏成可执行的确定性规则，输出可审阅、可追溯、可评分的中立分析。它不执行交易、不承诺预测、不声明收益。
+naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸馏成可执行的确定性规则，内置llm分析框架，可接入QQ/telegram/Discord等软件直接问ai此刻盘面怎么看，以及按照你的要求主动创建定时分析任务，甚至异动推送。输出可审阅、可追溯、可评分的中立分析。它不执行交易、不承诺预测、不声明收益。
 
 设计上坚持三条：
 
