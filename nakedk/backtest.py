@@ -2,7 +2,7 @@
 # nakedk/backtest.py - naked-k-analysis core price-action engine
 # (c) 2026 William-Trader (https://github.com/William-Trader)
 # WM: NKA-45E4B101
-# SPDX-License-Identifier: PolyForm-Noncommercial-1.0.0
+# SPDX-License-Identifier: LicenseRef-NKA-Personal-1.0
 # Removing this mark violates the license.
 # -----------------------------------------------------------------
 """Walk-forward backtest with intrabar path and realistic costs."""

@@ -2,7 +2,7 @@
 
 > Every core module carries an embedded watermark banner (WM: NKA-XXXXXXXX).
 > ID = NKA- + first 8 hex of sha1(naked-k-analysis|William-Trader + | + relpath).
-> Removing the banner violates the PolyForm Noncommercial 1.0.0 license. Watermark = traceability, not copy-prevention.
+> Removing the banner violates the Personal Use & Group Exchange License. Watermark = traceability, not copy-prevention.
 
 | File | WM ID |
 |---|---|
