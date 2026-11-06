@@ -28,7 +28,10 @@
     "likely requires probability >= 60%",
     "risk > reward requires 70% win rate else swing",
     "swing reward >= 2x risk; scalp win rate 60-90%",
-    "position size from stop distance, not the reverse"
+    "position size from stop distance, not the reverse",
+    "overlap >= 0.70 forbids any directional signal",
+    "trend entries require vol_z >= 0 (volume confirmation)",
+    "intrabar net return below cost is not an edge"
   ],
   "trader_equation": {
     "formula": "(win_probability x reward) > (loss_probability x risk)",
@@ -55,6 +58,34 @@
     "climax_after_bars": 20,
     "climax_reverse_prob": 0.50,
     "bull_flag_fail_rate": 0.40
+  },
+  "engine_gates_2026_11": {
+    "overlap_max": 0.70,
+    "min_vol_z": 0.0,
+    "confidence_cap": 60,
+    "adx_sweet_spot": [20, 30],
+    "adx_exhaustion": 40,
+    "position_risk_per_trade": [0.0025, 0.005],
+    "position_risk_total": 0.01,
+    "daily_stop": 0.02
+  },
+  "measured_2026_11_06": {
+    "scope": "BTCUSDT/ETHUSDT, 150d, 900 4h bars, 12bp round-trip cost, walk-forward 3 folds",
+    "baseline": {
+      "BTCUSDT": {"hit_rate": 38.6, "avg_net_pct": -0.105, "positive_folds": 0},
+      "ETHUSDT": {"hit_rate": 42.2, "avg_net_pct": -0.078, "positive_folds": 0}
+    },
+    "worst_bucket": {
+      "overlap_ge_0_70": {
+        "BTCUSDT": {"n": 19, "hit_rate": 31.6, "avg_net_pct": -0.236},
+        "ETHUSDT": {"n": 27, "hit_rate": 25.9, "avg_net_pct": -0.553}
+      }
+    },
+    "after_gates": {
+      "BTCUSDT": {"n": 63, "hit_rate": 47.6, "avg_net_pct": -0.033, "positive_folds": 2},
+      "ETHUSDT": {"n": 61, "hit_rate": 54.1, "avg_net_pct": 0.206, "positive_folds": 2}
+    },
+    "note": "in-sample; fold 3 negative on both symbols; no positive expectancy claimed"
   },
   "scoring": {
     "higher_timeframe_alignment": 20,

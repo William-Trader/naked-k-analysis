@@ -29,6 +29,8 @@ DEFAULTS = {
     "stance_pos_long": 0.70,       # pos20 above this -> buying disabled
     "stance_stop_atr": 1.5,        # stop distance in ATR
     "stance_target_atr": 3.0,      # target distance in ATR
+    "stance_overlap_max": 0.70,    # bar overlap >= this -> no signal (measured worst bucket)
+    "stance_min_vol_z": 0.0,       # volume z below this -> no trend entry
     # trend labels (nakedk.trend.trend_score)
     "trend_adx_trend": 20.0,       # ADX below this -> damp score toward 50
     "trend_label_up": 60.0,        # >= -> up / always_in long
