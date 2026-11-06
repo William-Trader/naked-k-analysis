@@ -16,8 +16,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Unit tests (stdlib only)
         run: python -m unittest discover -s tests -v
+      - name: Knowledge coverage (must stay 100%)
+        run: python scripts/knowledge_coverage.py
+
       - name: Syntax gate
-        run: python -m compileall -q nakedk pa_fetch.py
+        run: python -m compileall -q nakedk pa_fetch.py scripts
 
       - name: Dashboard JS syntax
         run: |

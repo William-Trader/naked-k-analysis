@@ -4,7 +4,7 @@ Zero-dependency price-action analysis and multi-frequency monitoring for crypto 
 
 [![ci](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![version](https://img.shields.io/badge/version-1.0.1-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#engineering)
 [![License: Personal Use & Group Exchange](https://img.shields.io/badge/License-Personal%20Use%20%26%20Group%20Exchange-blue.svg)](LICENSE)
 [![Watermarked](https://img.shields.io/badge/code-watermarked%20(NKA)-orange.svg)](WATERMARK.md)
@@ -56,7 +56,7 @@ naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸
 
 ![仪表盘](docs/screenshots/dashboard.png)
 
-**知识库** — 15 个知识模块目录 + 内置 Markdown 渲染：
+**知识库** — 20 个知识模块目录 + 内置 Markdown 渲染：
 
 ![知识库](docs/screenshots/knowledge.png)
 
@@ -78,7 +78,9 @@ naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸
 - **相关性门禁**：BTC/ETH 30 日相关 > 0.8 时视为同一风险，自动丢弃较弱一边（代码强制）。
 - **推送防刷**：30 分钟有效期 + 冷却/限流 + 失败重试与死信。
 - **OpenClaw 技能对接**：`skills/price-action-analyst` + 幂等安装脚本。
-- **工程化**：零依赖、154 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署。
+- **工程化**：零依赖、204 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署。
+- **知识覆盖自检**：`python3 scripts/knowledge_coverage.py` 对 30 个主题 × 20 个模块做关键词审计，CI 强制 100%。
+- **准确度自审**：`python3 scripts/accuracy_audit.py` 按方向/ADX/重叠/量能/位置分桶，输出命中率、Wilson 下界、扣费净收益与分折一致性。
 
 ### 趋势概率与形态共振
 
@@ -90,6 +92,29 @@ naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸
 - 18 组参数 × 2 标的 × 8 折、含 1h 盘中路径与 12bp 成本：**0 组平均收益为正**。
 - 最好一组 stop 1.5 / target 2.0 / ADX 22：平均 −0.034%，t = −0.66。
 - 因此方向输出保留为**描述性判断**，不作为入场依据；详见 `docs/OPTIMIZE.md`。
+
+### 准确度自审（2026-11-06，真实行情）
+
+口径：BTC/ETH 近 150 天、900 根 4h、12bp 往返成本、按时间三等分看折间一致性。
+
+| 指标 | BTC | ETH |
+|---|---|---|
+| 基线命中率 | 38.6% | 42.2% |
+| 基线平均净收益 | −0.105% | −0.078% |
+| 基线正收益折 | 0/3 | 0/3 |
+| 最差桶（overlap ≥0.70） | 31.6% / −0.236% | 25.9% / −0.553% |
+| 加门禁后命中率 | 47.6% | 54.1% |
+| 加门禁后平均净收益 | −0.033% | +0.206% |
+| 加门禁后正收益折 | 2/3 | 2/3 |
+
+本轮改动（全部由实测驱动）：
+
+1. **高重叠硬否决**：`overlap ≥ 0.70` 直接中性。该桶在两个标的上都是最差桶，属于「无结构可交易」而非「方向看错」。
+2. **量能确认**：趋势延续入场要求 `vol_z ≥ 0`；没有参与度的突破不接。
+3. **置信度重标定**：原固定 56–64 与结果不单调（conf ≥62 的命中率低于基线），改为 35–60 的质量分级，新增 `grade` / `evidence` 字段，不再伪装成概率。
+4. **知识库补全**：新增 15–20 六个模块（头寸规模、多周期、失败突破、时段缺口、证据方法、执行心理），20 模块 × 30 主题覆盖 100%，CI 强制校验。
+
+诚实结论：门禁移除了已知最差的交易，把 4h 命中率拉到 47.6%/54.1%，但第 3 折仍为负，**仍不宣称正期望**；这是「少亏、可复核」，不是「能稳定赚钱」。复现：`PYTHONPATH=. python3 scripts/accuracy_audit.py`。
 
 ---
 

@@ -22,5 +22,7 @@
 | pa_fetch.py | NKA-FD2C1B22 |
 | scripts/pa_cron_setup.sh | NKA-98995EAC |
 | scripts/pa_run.sh | NKA-B3E5AC11 |
+| scripts/accuracy_audit.py | NKA-2B092075 |
+| scripts/knowledge_coverage.py | NKA-389AFEB5 |
 
-**Total marked files: 16**
+**Total marked files: 18**
