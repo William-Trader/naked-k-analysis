@@ -29,8 +29,10 @@ async function boot() {
   bindUI();
   subscribe(render);
   try {
-    const [uni, settings] = await Promise.all([get('/api/universe'), get('/api/settings')]);
-    patch({ universe: uni.universe || [], settings });
+    const [uni, settings, llm] = await Promise.all([
+      get('/api/universe'), get('/api/settings'), get('/api/llm/status')
+    ]);
+    patch({ universe: uni.universe || [], settings, llm });
     if (!state.interval) state.interval = (settings.intervals || ['4h'])[0];
     await loadOverview();
     if (!state.symbols[state.active]) {
