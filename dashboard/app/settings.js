@@ -184,6 +184,8 @@ export async function openSettings() {
         <input type="checkbox" data-setting="push_armed" ${settings.push_armed ? 'checked' : ''}></div>
       <div class="field"><label>QQ 群 target（可留空，走环境变量）</label>
         <input id="set-qq-target" placeholder="例如 123456789" value="${esc(settings.qq_target || '')}"></div>
+      <div class="field"><label>推送节点 SSH（本机无 qqbot 时填，例如 qsp）</label>
+        <input id="set-push-ssh" placeholder="留空=本机发送" value="${esc(settings.push_ssh || '')}"></div>
       <div class="row2">
         <div class="field"><label>分析有效期（分钟）</label>
           <input type="number" id="set-ttl" min="2" max="240" value="${settings.analysis_ttl_min || 30}"></div>
@@ -341,6 +343,7 @@ async function saveSettings() {
     auto_push: document.querySelector('[data-setting="auto_push"]').checked,
     push_armed: document.querySelector('[data-setting="push_armed"]').checked,
     qq_target: document.getElementById('set-qq-target').value.trim(),
+    push_ssh: document.getElementById('set-push-ssh').value.trim(),
     llm_annotate: document.querySelector('[data-setting="llm_annotate"]').checked,
     llm_autotune: document.querySelector('[data-setting="llm_autotune"]').checked
   };

@@ -49,6 +49,7 @@ DEFAULTS = {
     "auto_push": False,              # QQ delivery is opt-in
     "push_armed": False,             # also push newly armed plans
     "qq_target": "",                 # optional per-settings target
+    "push_ssh": "",                  # send through a remote qqbot gateway
     "quiet_hours": [23, 8],
     "llm_annotate": True,
     "llm_autotune": False,
@@ -118,6 +119,7 @@ def _sanitise(s: dict) -> dict:
     s["trigger_seconds"] = max(5, min(300, int(s.get("trigger_seconds") or 20)))
     s["max_open_plans"] = max(1, min(8, int(s.get("max_open_plans") or 2)))
     s["qq_target"] = str(s.get("qq_target") or "").strip()[:200]
+    s["push_ssh"] = str(s.get("push_ssh") or "").strip()[:120]
     qh = s.get("quiet_hours") or [23, 8]
     if isinstance(qh, list) and len(qh) == 2:
         s["quiet_hours"] = [int(qh[0]) % 24, int(qh[1]) % 24]

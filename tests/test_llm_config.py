@@ -10,6 +10,10 @@ from unittest import mock
 from nakedk import llm
 
 
+def missing_key():
+    return os.path.join(tempfile.mkdtemp(prefix="nk-nokey-"), "missing.key")
+
+
 def write_cfg(cfg):
     d = tempfile.mkdtemp(prefix="nk-llm-")
     p = os.path.join(d, "llm.json")
@@ -37,7 +41,7 @@ class SettingsTest(unittest.TestCase):
         env = {"NK_LLM_KEY": "", "DEEPSEEK_API_KEY": "",
                "NK_LLM_BASE": "", "NK_LLM_MODEL": ""}
         with mock.patch.dict(os.environ, env, clear=False):
-            s = llm._settings(path=p)
+            s = llm._settings(path=p, key_file=missing_key())
         self.assertFalse(s["enabled"])
         self.assertIn("DEEPSEEK_API_KEY", s["reason"])
         self.assertEqual(s["model"], "deepseek-chat")
@@ -50,7 +54,7 @@ class SettingsTest(unittest.TestCase):
         env = {"NK_LLM_KEY": "", "DEEPSEEK_API_KEY": "test-key",
                "NK_LLM_BASE": "", "NK_LLM_MODEL": ""}
         with mock.patch.dict(os.environ, env, clear=False):
-            s = llm._settings(path=p)
+            s = llm._settings(path=p, key_file=missing_key())
         self.assertTrue(s["enabled"])
         self.assertEqual(s["key"], "test-key")
 
@@ -61,7 +65,7 @@ class SettingsTest(unittest.TestCase):
                        "require_key": False})
         env = {"NK_LLM_KEY": "", "NK_LLM_BASE": "", "NK_LLM_MODEL": ""}
         with mock.patch.dict(os.environ, env, clear=False):
-            s = llm._settings(path=p)
+            s = llm._settings(path=p, key_file=missing_key())
         self.assertTrue(s["enabled"])
         self.assertTrue(s["local"])
 
@@ -72,7 +76,7 @@ class SettingsTest(unittest.TestCase):
         env = {"NK_LLM_KEY": "k", "NK_LLM_BASE": "https://example.com/v1",
                "NK_LLM_MODEL": "custom-model"}
         with mock.patch.dict(os.environ, env, clear=False):
-            s = llm._settings(path=p)
+            s = llm._settings(path=p, key_file=missing_key())
         self.assertEqual(s["base"], "https://example.com/v1")
         self.assertEqual(s["model"], "custom-model")
         self.assertTrue(s["enabled"])
@@ -101,7 +105,7 @@ class SettingsTest(unittest.TestCase):
                        "model": "deepseek-chat", "api_key_env": "DEEPSEEK_API_KEY",
                        "require_key": True})
         env = {"NK_LLM_KEY": "", "DEEPSEEK_API_KEY": "", "NK_LLM_BASE": "",
-               "NK_LLM_MODEL": ""}
+               "NK_LLM_MODEL": "", "NK_LLM_KEY_FILE": missing_key()}
         with mock.patch.dict(os.environ, env, clear=False):
             st = llm.status()
         self.assertNotIn("key", st)
