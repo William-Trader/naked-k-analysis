@@ -73,7 +73,7 @@ class SettingsTest(unittest.TestCase):
         p = write_cfg({"base": "https://api.deepseek.com/v1",
                        "model": "deepseek-chat", "api_key_env": "DEEPSEEK_API_KEY",
                        "require_key": True})
-        env = {"NK_LLM_KEY": "k", "NK_LLM_BASE": "https://example.com/v1",
+        env = {"NK_LLM_KEY": "test-key-123", "NK_LLM_BASE": "https://example.com/v1",
                "NK_LLM_MODEL": "custom-model"}
         with mock.patch.dict(os.environ, env, clear=False):
             s = llm._settings(path=p, key_file=missing_key())
@@ -98,6 +98,30 @@ class SettingsTest(unittest.TestCase):
         self.assertTrue(s["enabled"])
         self.assertEqual(s["key_source"], "file")
         llm.clear_key(path=key_path)
+        self.assertFalse(os.path.exists(key_path))
+
+    def test_invalid_key_file_is_disabled(self):
+        d = tempfile.mkdtemp(prefix="nk-badkey-")
+        key_path = os.path.join(d, "llm.key")
+        with open(key_path, "w", encoding="utf-8") as fh:
+            fh.write("AI 解读未启用。生成解读与引擎")
+        cfg = write_cfg({"base": "https://api.deepseek.com/v1",
+                         "model": "deepseek-chat",
+                         "api_key_env": "DEEPSEEK_API_KEY",
+                         "require_key": True})
+        env = {"NK_LLM_KEY": "", "DEEPSEEK_API_KEY": "",
+               "NK_LLM_BASE": "", "NK_LLM_MODEL": ""}
+        with mock.patch.dict(os.environ, env, clear=False):
+            s = llm._settings(path=cfg, key_file=key_path)
+        self.assertFalse(s["enabled"])
+        self.assertTrue(s["key_invalid"])
+        self.assertIn("ASCII", s["reason"])
+
+    def test_save_invalid_key_is_rejected(self):
+        d = tempfile.mkdtemp(prefix="nk-badkey-")
+        key_path = os.path.join(d, "llm.key")
+        res = llm.save_key("中文字符不是 key", path=key_path)
+        self.assertFalse(res["ok"])
         self.assertFalse(os.path.exists(key_path))
 
     def test_status_never_returns_key(self):
