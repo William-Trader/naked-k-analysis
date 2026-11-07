@@ -197,11 +197,21 @@ def clear_key(path=None) -> dict:
         return {"ok": False, "error": str(e)[:200]}
 
 
+def _ssl_context():
+    """Use the OS trust store (or NK_LLM_CA) instead of Python's partial bundle."""
+    ca = os.environ.get("NK_LLM_CA")
+    if ca:
+        import ssl
+        return ssl.create_default_context(cafile=ca)
+    from .http import _ssl_context as system_context
+    return system_context()
+
+
 def _post(url, payload, headers, timeout):
     req = urllib.request.Request(
         url, data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json", **headers}, method="POST")
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context()) as r:
         return json.loads(r.read().decode("utf-8"))
 
 
