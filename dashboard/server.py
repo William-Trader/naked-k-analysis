@@ -459,6 +459,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(api_settings(body))
             if u.path == "/api/symbol-params":
                 return self._send(api_symbol_params(q, body))
+            if u.path == "/api/llm/key":
+                if body.get("clear"):
+                    res = llm.clear_key()
+                else:
+                    res = llm.save_key(body.get("api_key") or body.get("key") or "")
+                if res.get("ok"):
+                    _broadcast("llm", llm.status())
+                return self._send(res)
             if u.path == "/api/llm/annotate":
                 return self._send(api_llm_annotate(body))
             if u.path == "/api/llm/optimize":

@@ -41,6 +41,7 @@ export function connect(onEvent, onState) {
     es.addEventListener('symbol', e => onEvent && onEvent('symbol', JSON.parse(e.data)));
     es.addEventListener('plan', e => onEvent && onEvent('plan', JSON.parse(e.data)));
     es.addEventListener('settings', e => onEvent && onEvent('settings', JSON.parse(e.data)));
+    es.addEventListener('llm', e => onEvent && onEvent('llm', JSON.parse(e.data)));
     es.onerror = () => {
       onState && onState(false);
       es.close();

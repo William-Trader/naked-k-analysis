@@ -80,7 +80,7 @@ armed(待触发) -> triggered(到触发区) -> confirmed(确认) -> managing(持
 
 支持任意 OpenAI 兼容接口（DeepSeek / OpenAI / 通义千问 / Moonshot / Ollama / vLLM）。
 
-- **配置方式**：复制 `config/llm.example.json` 为 `config/llm.local.json`，把 `api_key_env` 指向保存 key 的环境变量；也可用 `NK_LLM_BASE` / `NK_LLM_MODEL` / `NK_LLM_KEY` 覆盖。详见 [docs/LLM.md](docs/LLM.md)。
+- **配置方式**：面板右上角 `⚙ → LLM → API Key` 可直接输入（保存到本机 `state/llm.key`，0600，不回显）；也可复制 `config/llm.example.json` 为 `config/llm.local.json`，把 `api_key_env` 指向保存 key 的环境变量，或用 `NK_LLM_BASE` / `NK_LLM_MODEL` / `NK_LLM_KEY` 覆盖。详见 [docs/LLM.md](docs/LLM.md)。
 - **图表解读**：输入确定性引擎输出，输出一句话结论、情景、失效条件与风险提示；不生成价位。
 - **受限参数迭代**：仅在计划样本充足（总数 ≥20、已结束 ≥10）时提出 ≤2 个参数的小幅调整；越界、非数字、未知键一律拒绝；每天最多一次。
 - **自检**：`python3 scripts/llm_check.py` 查看配置；加 `--ping` 做一次真实请求。
@@ -88,8 +88,9 @@ armed(待触发) -> triggered(到触发区) -> confirmed(确认) -> managing(持
 
 ### 7. 推送与实时
 
-- 计划状态迁移写入 `outbox`，由 `beagle/push.py` 通过 OpenClaw qqbot 通道推送；默认关闭，设置中显式开启。
-- 只推 `确认 / 目标达成 / 止损 / 失效`，不推心跳；静默时段保留风险类通知。
+- 计划状态迁移写入 `outbox`，由 `beagle/push.py` 通过 OpenClaw qqbot 通道推送；设置中开启「QQ 推送」并填写群 target（或环境变量 `BEAGLE_QQ_TARGET`）。
+- 推送是简单可执行格式：`标的 · 周期 · 方向` / `状态` / `操作` / `触发/止损/目标` / `依据` / `风控` / `数据 + 免责声明`；只推 `确认 / 目标达成 / 止损 / 失效`，不推心跳。
+- 触发价到达后先自动重跑分析，确认通过才推送「可执行」建议；未通过推送「结构失效」，不裸触发。
 - 前端通过 SSE `/api/stream` 接收 symbol / plan / settings 事件，同时保留 25s 轮询兜底。
 
 ### 8. 自动再分析（到价触发）
@@ -180,7 +181,8 @@ python3 -m unittest discover -s tests
 | `NK_SYMBOL_PROFILES` | 标的参数库 | `<repo>/state/symbol_profiles.json` |
 | `NK_DASH_TOKEN` | 可选 Bearer/查询 token | 空（不鉴权） |
 | `NK_LLM_CONFIG` | LLM 配置文件 | `config/llm.local.json` |
-| `NK_LLM_KEY` | LLM API key | 空（关闭） |
+| `NK_LLM_KEY` | LLM API key（优先级最高） | 空（关闭） |
+| `NK_LLM_KEY_FILE` | 面板输入的 key 文件 | `state/llm.key` |
 | `NK_LLM_BASE` | OpenAI 兼容 base URL | 配置文件 / `https://api.openai.com/v1` |
 | `NK_LLM_MODEL` | 模型名 | 配置文件 / `gpt-4o-mini` |
 | `BEAGLE_QQ_TARGET` | qqbot 推送目标 | 空（不推） |

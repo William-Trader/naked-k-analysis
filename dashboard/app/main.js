@@ -99,6 +99,8 @@ function startStream() {
       }
     } else if (ev === 'settings') {
       patch({ settings: data });
+    } else if (ev === 'llm') {
+      patch({ llm: data });
     }
   }, ok => patch({ connected: ok }));
 }
@@ -205,6 +207,14 @@ async function onPanelClick(e) {
     return;
   }
   if (act === 'open-settings') return openSettings();
+  if (act === 'llm-key') {
+    await openSettings();
+    setTimeout(() => {
+      const el = document.getElementById('llm-key-input');
+      if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); }
+    }, 120);
+    return;
+  }
 }
 
 function tickClock() {

@@ -45,6 +45,8 @@ CONFIG_PATH = os.environ.get("NK_LLM_CONFIG") or os.path.join(
     ROOT, "config", "llm.local.json")
 CACHE_PATH = os.environ.get("NK_LLM_CACHE", os.path.join(
     ROOT, "state", "llm_cache.json"))
+KEY_PATH = os.environ.get("NK_LLM_KEY_FILE", os.path.join(
+    ROOT, "state", "llm.key"))
 _LOCK = threading.RLock()
 
 ANNOTATE_SYSTEM = (
@@ -74,17 +76,32 @@ def _read_config(path=None):
         return {}, p
 
 
-def _settings(path=None) -> dict:
+def _file_key(path=None) -> str:
+    p = path or os.environ.get("NK_LLM_KEY_FILE") or KEY_PATH
+    try:
+        with open(p, encoding="utf-8") as fh:
+            return (fh.read() or "").strip()
+    except Exception:
+        return ""
+
+
+def _settings(path=None, key_file=None) -> dict:
     """Resolve effective settings without ever exposing the key."""
     cfg, config_path = _read_config(path)
     base = (os.environ.get("NK_LLM_BASE") or cfg.get("base") or DEFAULT_BASE).rstrip("/")
     model = os.environ.get("NK_LLM_MODEL") or cfg.get("model") or DEFAULT_MODEL
     key_env = (cfg.get("api_key_env") or "NK_LLM_KEY").strip()
     key = os.environ.get("NK_LLM_KEY") or ""
+    key_source = "env" if key else None
     if not key and key_env:
         key = os.environ.get(key_env) or ""
+        key_source = "env" if key else None
+    if not key:
+        key = _file_key(key_file)
+        key_source = "file" if key else None
     if not key and cfg.get("api_key"):
         key = str(cfg.get("api_key") or "")
+        key_source = "config" if key else None
     local = base.startswith(("http://127.0.0.1", "http://localhost",
                              "http://[::1]", "http://0.0.0.0"))
     require_key = bool(cfg.get("require_key", not local))
@@ -100,7 +117,9 @@ def _settings(path=None) -> dict:
         "base": base,
         "model": model,
         "key": key,
+        "key_source": key_source,
         "key_env": key_env,
+        "key_file": key_file or os.environ.get("NK_LLM_KEY_FILE") or KEY_PATH,
         "requires_key": require_key,
         "local": local,
         "config_path": config_path,
@@ -122,9 +141,44 @@ def status() -> dict:
         "config_path": s["config_path"],
         "config_exists": s["config_exists"],
         "key_env": s["key_env"],
+        "key_source": s["key_source"],
+        "key_configured": bool(s["key"]),
+        "key_file": s["key_file"],
         "requires_key": s["requires_key"],
         "local": s["local"],
     }
+
+
+def save_key(key: str, path=None) -> dict:
+    """Store a key in a 0600 local file. Never return or log the value."""
+    key = (key or "").strip()
+    if not key:
+        return {"ok": False, "error": "empty_key"}
+    p = path or os.environ.get("NK_LLM_KEY_FILE") or KEY_PATH
+    try:
+        os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+        tmp = p + ".tmp"
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(key + "\n")
+        os.replace(tmp, p)
+        try:
+            os.chmod(p, 0o600)
+        except Exception:
+            pass
+        return {"ok": True, "status": status()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
+
+
+def clear_key(path=None) -> dict:
+    p = path or os.environ.get("NK_LLM_KEY_FILE") or KEY_PATH
+    try:
+        if os.path.exists(p):
+            os.remove(p)
+        return {"ok": True, "status": status()}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:200]}
 
 
 def _post(url, payload, headers, timeout):

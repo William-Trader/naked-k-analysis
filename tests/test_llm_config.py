@@ -77,6 +77,25 @@ class SettingsTest(unittest.TestCase):
         self.assertEqual(s["model"], "custom-model")
         self.assertTrue(s["enabled"])
 
+    def test_save_and_clear_key_file(self):
+        d = tempfile.mkdtemp(prefix="nk-key-")
+        key_path = os.path.join(d, "llm.key")
+        cfg = write_cfg({"base": "https://api.deepseek.com/v1",
+                         "model": "deepseek-chat",
+                         "api_key_env": "DEEPSEEK_API_KEY",
+                         "require_key": True})
+        res = llm.save_key("test-key", path=key_path)
+        self.assertTrue(res["ok"])
+        self.assertEqual(os.stat(key_path).st_mode & 0o777, 0o600)
+        env = {"NK_LLM_KEY": "", "DEEPSEEK_API_KEY": "",
+               "NK_LLM_BASE": "", "NK_LLM_MODEL": ""}
+        with mock.patch.dict(os.environ, env, clear=False):
+            s = llm._settings(path=cfg, key_file=key_path)
+        self.assertTrue(s["enabled"])
+        self.assertEqual(s["key_source"], "file")
+        llm.clear_key(path=key_path)
+        self.assertFalse(os.path.exists(key_path))
+
     def test_status_never_returns_key(self):
         p = write_cfg({"base": "https://api.deepseek.com/v1",
                        "model": "deepseek-chat", "api_key_env": "DEEPSEEK_API_KEY",
