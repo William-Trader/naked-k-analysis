@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import shlex
 import subprocess
 import time
 
@@ -49,6 +50,28 @@ def resolve_target(cfg: dict, db_path: str):
         os.path.dirname(db_path) or ".", ".beagle.env")
     load_env_file(path)
     return os.environ.get("BEAGLE_QQ_TARGET")
+
+
+def transport_host(cfg: dict | None) -> str:
+    return str((cfg or {}).get("push_ssh") or os.environ.get("BEAGLE_PUSH_SSH") or "").strip()
+
+
+def _run_send(args: list, cfg: dict | None):
+    """Send through this gateway, or through a configured SSH gateway.
+
+    A remote host is used when the local gateway has no qqbot channel but
+    another machine (e.g. the old qsp box) already has one configured. The
+    message is passed as a single quoted argv, never interpolated into a
+    shell string on the local side.
+    """
+    host = transport_host(cfg)
+    if host:
+        remote = "openclaw " + " ".join(shlex.quote(a) for a in args)
+        cmd = ["ssh", "-T", "-o", "BatchMode=yes", "-o",
+               "StrictHostKeyChecking=no", host, remote]
+    else:
+        cmd = [cli_path()] + args
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=90)
 
 
 def is_stale(created_at, now_ms: int, max_age_min: int) -> bool:
@@ -123,10 +146,10 @@ def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20
             results.append({"id": a["id"], "status": "no_target"})
             continue
         text = _with_data_footer(a)
-        cmd = [cli_path(), "message", "send", "--channel", "qqbot",
-               "--target", target, "--message", text]
+        args = ["message", "send", "--channel", "qqbot",
+                "--target", target, "--message", text]
         try:
-            p = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            p = _run_send(args, cfg)
         except Exception as e:
             err = str(e)[:200]
             info = store.fail_alert(db_path, a["id"], err, cfg.get("max_push_attempts", 5))
@@ -175,10 +198,10 @@ def push_outbox(db_path: str, cfg: dict | None = None, dry_run: bool = False,
         if _quiet(now_hour, cfg) and not urgent:
             out.append({"id": row["id"], "status": "quiet_skip"})
             continue
-        cmd = [cli_path(), "message", "send", "--channel", "qqbot",
-               "--target", target, "--message", row["text"]]
+        args = ["message", "send", "--channel", "qqbot",
+                "--target", target, "--message", row["text"]]
         try:
-            p = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+            p = _run_send(args, cfg)
         except Exception as e:
             store.outbox_mark(db_path, row["id"], "failed", str(e)[:200])
             out.append({"id": row["id"], "status": "failed",

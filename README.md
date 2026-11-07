@@ -90,6 +90,7 @@ armed(待触发) -> triggered(到触发区) -> confirmed(确认) -> managing(持
 
 - 计划状态迁移写入 `outbox`，由 `beagle/push.py` 通过 OpenClaw qqbot 通道推送；设置中开启「QQ 推送」并填写群 target（或环境变量 `BEAGLE_QQ_TARGET`）。
 - 推送是简单可执行格式：`标的 · 周期 · 方向` / `状态` / `操作` / `触发/止损/目标` / `依据` / `风控` / `数据 + 免责声明`；只推 `确认 / 目标达成 / 止损 / 失效`，不推心跳。
+- 本机 OpenClaw 没有 qqbot 时，设置 `push_ssh`（例如 `qsp`）通过已配置 qqbot 的远程网关发送；命令行参数逐项 quote，不做 shell 拼接。
 - 触发价到达后先自动重跑分析，确认通过才推送「可执行」建议；未通过推送「结构失效」，不裸触发。
 - 前端通过 SSE `/api/stream` 接收 symbol / plan / settings 事件，同时保留 25s 轮询兜底。
 
@@ -186,6 +187,7 @@ python3 -m unittest discover -s tests
 | `NK_LLM_BASE` | OpenAI 兼容 base URL | 配置文件 / `https://api.openai.com/v1` |
 | `NK_LLM_MODEL` | 模型名 | 配置文件 / `gpt-4o-mini` |
 | `BEAGLE_QQ_TARGET` | qqbot 推送目标 | 空（不推） |
+| `BEAGLE_PUSH_SSH` | 通过远程网关发送的 SSH host | 空（本机） |
 
 ---
 
