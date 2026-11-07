@@ -94,3 +94,32 @@ def get_json(url, timeout=15, max_retries=3, proxy=None):
         if attempt < max_retries:
             time.sleep(wait + random.uniform(0, 0.5))
     raise last
+
+
+def get_text(url, timeout=15, max_retries=2, encoding="utf-8", referer=None):
+    """GET raw text with optional Referer (Sina blocks requests without one).
+
+    Used by providers whose payload is JSONP / GBK rather than JSON.
+    """
+    last = None
+    headers = dict(UA)
+    if referer:
+        headers["Referer"] = referer
+    for attempt in range(max_retries + 1):
+        req = urllib.request.Request(url, headers=headers)
+        ctx = _ssl_context()
+        try:
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                return r.read().decode(encoding, errors="replace")
+        except urllib.error.HTTPError as e:
+            last = e
+            if e.code in RETRYABLE_HTTP or e.code >= 500:
+                wait = _retry_after(e) or (2.0 ** attempt)
+            else:
+                raise
+        except (urllib.error.URLError, OSError) as e:
+            last = e
+            wait = 2.0 ** attempt
+        if attempt < max_retries:
+            time.sleep(wait + random.uniform(0, 0.4))
+    raise last

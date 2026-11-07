@@ -75,6 +75,55 @@ CREATE TABLE IF NOT EXISTS health (
   errors INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS plans (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol TEXT NOT NULL,
+  interval TEXT NOT NULL,
+  side TEXT NOT NULL,
+  setup TEXT,
+  status TEXT NOT NULL,
+  trigger REAL,
+  stop REAL,
+  target1 REAL,
+  target2 REAL,
+  ttl_at INTEGER,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  confirmed_at INTEGER,
+  closed_at INTEGER,
+  outcome TEXT,
+  pnl_pct REAL,
+  data TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_plans_symbol ON plans(symbol, status);
+CREATE INDEX IF NOT EXISTS idx_plans_created ON plans(created_at);
+
+CREATE TABLE IF NOT EXISTS plan_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_id INTEGER NOT NULL,
+  symbol TEXT,
+  type TEXT NOT NULL,
+  price REAL,
+  ts INTEGER NOT NULL,
+  payload TEXT,
+  idempotency_key TEXT UNIQUE,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_plan_events_plan ON plan_events(plan_id, id);
+
+CREATE TABLE IF NOT EXISTS outbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  plan_event_id INTEGER NOT NULL,
+  channel TEXT NOT NULL,
+  text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending',
+  attempts INTEGER NOT NULL DEFAULT 0,
+  created_at INTEGER NOT NULL,
+  sent_at INTEGER,
+  UNIQUE(plan_event_id, channel)
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status, id);
+
 CREATE TABLE IF NOT EXISTS state (
   symbol TEXT PRIMARY KEY,
   state TEXT,
@@ -341,5 +390,212 @@ def status(path: str) -> dict:
             "last_health": one("SELECT * FROM health ORDER BY id DESC LIMIT 1"),
             "last_event": one("SELECT * FROM events ORDER BY id DESC LIMIT 1"),
         }
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# plan lifecycle persistence
+# ---------------------------------------------------------------------------
+
+ACTIVE_STATUSES = ("armed", "triggered", "confirmed", "managing")
+
+
+def save_plan(path: str, plan: dict) -> dict:
+    """Insert or update one plan; returns the stored plan with id."""
+    import json as _json
+    plan = dict(plan or {})
+    now = _now()
+    payload = _json.dumps(plan, ensure_ascii=False, default=str)
+    conn = connect(path)
+    try:
+        pid = plan.get("id")
+        if pid:
+            conn.execute(
+                "UPDATE plans SET status=?, trigger=?, stop=?, target1=?, target2=?, "
+                "ttl_at=?, updated_at=?, confirmed_at=?, closed_at=?, outcome=?, "
+                "pnl_pct=?, data=? WHERE id=?",
+                (plan.get("status"), plan.get("trigger"), plan.get("stop"),
+                 plan.get("target1"), plan.get("target2"), plan.get("ttl_at"),
+                 now, plan.get("confirmed_at"), plan.get("closed_at"),
+                 plan.get("outcome"), plan.get("pnl_pct"), payload, pid))
+        else:
+            cur = conn.execute(
+                "INSERT INTO plans(symbol,interval,side,setup,status,trigger,stop,"
+                "target1,target2,ttl_at,created_at,updated_at,confirmed_at,"
+                "closed_at,outcome,pnl_pct,data) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (plan.get("symbol"), plan.get("interval"), plan.get("side"),
+                 plan.get("setup"), plan.get("status"), plan.get("trigger"),
+                 plan.get("stop"), plan.get("target1"), plan.get("target2"),
+                 plan.get("ttl_at"), plan.get("created_at") or now, now,
+                 plan.get("confirmed_at"), plan.get("closed_at"),
+                 plan.get("outcome"), plan.get("pnl_pct"), payload))
+            pid = cur.lastrowid
+        conn.commit()
+        plan["id"] = pid
+        return plan
+    finally:
+        conn.close()
+
+
+def _plan_row(row) -> dict:
+    import json as _json
+    d = dict(row)
+    try:
+        data = _json.loads(d.pop("data") or "{}")
+    except Exception:
+        data = {}
+    data.update({k: v for k, v in d.items() if v is not None})
+    return data
+
+
+def get_plan(path: str, plan_id: int):
+    conn = connect(path)
+    try:
+        row = conn.execute("SELECT * FROM plans WHERE id=?", (plan_id,)).fetchone()
+        return _plan_row(row) if row else None
+    finally:
+        conn.close()
+
+
+def active_plan(path: str, symbol: str, interval: str | None = None):
+    conn = connect(path)
+    try:
+        if interval:
+            row = conn.execute(
+                "SELECT * FROM plans WHERE symbol=? AND interval=? AND status IN "
+                "('armed','triggered','confirmed','managing') ORDER BY id DESC LIMIT 1",
+                (symbol, interval)).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT * FROM plans WHERE symbol=? AND status IN "
+                "('armed','triggered','confirmed','managing') ORDER BY id DESC LIMIT 1",
+                (symbol,)).fetchone()
+        return _plan_row(row) if row else None
+    finally:
+        conn.close()
+
+
+def open_plans(path: str, symbol: str | None = None):
+    conn = connect(path)
+    try:
+        sql = ("SELECT * FROM plans WHERE status IN "
+               "('armed','triggered','confirmed','managing')")
+        args = ()
+        if symbol:
+            sql += " AND symbol=?"
+            args = (symbol,)
+        sql += " ORDER BY id DESC"
+        return [_plan_row(r) for r in conn.execute(sql, args).fetchall()]
+    finally:
+        conn.close()
+
+
+def list_plans(path: str, symbol: str | None = None, limit: int = 40):
+    conn = connect(path)
+    try:
+        sql = "SELECT * FROM plans"
+        args = []
+        if symbol:
+            sql += " WHERE symbol=?"
+            args.append(symbol)
+        sql += " ORDER BY id DESC LIMIT ?"
+        args.append(limit)
+        return [_plan_row(r) for r in conn.execute(sql, args).fetchall()]
+    finally:
+        conn.close()
+
+
+def add_plan_event(path: str, plan: dict, event: dict, key: str):
+    """Append one transition; returns event id or None when idempotent-skipped."""
+    import json as _json
+    conn = connect(path)
+    try:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO plan_events(plan_id,symbol,type,price,ts,payload,"
+            "idempotency_key,created_at) VALUES(?,?,?,?,?,?,?,?)",
+            (plan.get("id"), plan.get("symbol"), event.get("type"),
+             event.get("price"), event.get("ts"), _json.dumps(event, ensure_ascii=False),
+             key, _now()))
+        conn.commit()
+        return cur.lastrowid if cur.rowcount else None
+    finally:
+        conn.close()
+
+
+def plan_events(path: str, plan_id: int | None = None, limit: int = 60):
+    import json as _json
+    conn = connect(path)
+    try:
+        if plan_id:
+            rows = conn.execute(
+                "SELECT * FROM plan_events WHERE plan_id=? ORDER BY id DESC LIMIT ?",
+                (plan_id, limit)).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM plan_events ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["event"] = _json.loads(d.pop("payload") or "{}")
+            except Exception:
+                d["event"] = {}
+            out.append(d)
+        return out
+    finally:
+        conn.close()
+
+
+def plan_stats(path: str, symbol: str | None = None) -> dict:
+    conn = connect(path)
+    try:
+        where, args = "", ()
+        if symbol:
+            where, args = " WHERE symbol=?", (symbol,)
+        total = conn.execute("SELECT COUNT(*) c FROM plans" + where, args).fetchone()["c"]
+        closed = conn.execute(
+            "SELECT COUNT(*) c FROM plans" + where +
+            (" AND" if where else " WHERE") + " closed_at IS NOT NULL", args).fetchone()["c"]
+        rows = conn.execute(
+            "SELECT outcome, COUNT(*) c, AVG(pnl_pct) p FROM plans" + where +
+            " GROUP BY outcome", args).fetchall()
+        by_out = {r["outcome"] or "open": {"n": r["c"],
+                                           "avg_pnl": round(r["p"], 3) if r["p"] is not None else None}
+                  for r in rows}
+        return {"total": total, "closed": closed, "by_outcome": by_out}
+    finally:
+        conn.close()
+
+
+def outbox_add(path: str, plan_event_id: int, channel: str, text: str):
+    conn = connect(path)
+    try:
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO outbox(plan_event_id,channel,text,status,attempts,"
+            "created_at) VALUES(?,?,?,'pending',0,?)",
+            (plan_event_id, channel, text, _now()))
+        conn.commit()
+        return cur.lastrowid if cur.rowcount else None
+    finally:
+        conn.close()
+
+
+def outbox_pending(path: str, limit: int = 20):
+    conn = connect(path)
+    try:
+        return [dict(r) for r in conn.execute(
+            "SELECT * FROM outbox WHERE status='pending' ORDER BY id LIMIT ?",
+            (limit,)).fetchall()]
+    finally:
+        conn.close()
+
+
+def outbox_mark(path: str, oid: int, status: str, err: str = ""):
+    conn = connect(path)
+    try:
+        conn.execute("UPDATE outbox SET status=?, attempts=attempts+1, sent_at=? "
+                     "WHERE id=?", (status, _now() if status == "sent" else None, oid))
+        conn.commit()
     finally:
         conn.close()

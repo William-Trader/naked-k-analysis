@@ -25,4 +25,12 @@
 | scripts/accuracy_audit.py | NKA-2B092075 |
 | scripts/knowledge_coverage.py | NKA-389AFEB5 |
 
-**Total marked files: 18**
+| nakedk/analysis.py | NKA-D97BF60A |
+| nakedk/annotations.py | NKA-3DC589D6 |
+| nakedk/plans.py | NKA-49345A05 |
+| nakedk/multi.py | NKA-6B8E951C |
+| nakedk/symbol_params.py | NKA-48F37A82 |
+| nakedk/llm.py | NKA-3CB98FE9 |
+| beagle/engine.py | NKA-08D00909 |
+
+**Total marked files: 25**

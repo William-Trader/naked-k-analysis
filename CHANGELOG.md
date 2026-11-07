@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.0.0 — 2026-11-08
+
+系统性重构：从「行情卡片 + 事件提醒」升级为「价格行为 AI 交易面板 + 计划生命周期」。
+
+### 前端架构
+- 拆分为原生 ES modules：`app/main.js`（启动/路由/SSE）、`chart.js`（LWC + Canvas 标注层）、`panels.js`（右侧模块）、`settings.js`（标的池/周期/自动化/参数库）、`api.js`/`store.js`/`format.js`；`index.html` 只保留壳。
+- 专业双栏终端：左侧 K 线主图 + EMA/成交量，右侧 7 个模块（综合研判、交易计划、周期分析、关键价位、AI 解读、计划事件、数据与引擎）。
+- 图表几何由服务端 `nakedk/annotations.py` 生成，Canvas 叠加绘制：ZigZag/HH-HL-LH-LL、支撑阻力聚类、趋势通道、供需区、双底/双顶/头肩/三角/楔形/旗形、颈线与量度目标、计划触发/止损/目标/风险区。
+- SSE `/api/stream` 实时推送 symbol / plan / settings；25s 轮询兜底。
+
+### 多市场
+- 新增新浪财经国内期货 provider（RB0/HC0/I0/J0/JM0/CU0/AL0/AU0/AG0/SC0/MA0/TA0/M0/Y0/P0/CF0/SR0/FG0/SA0/RU0/BU0），统一归一化为 Binance K 线形状。
+- 扩展大宗商品与海外期货标的；Yahoo 4h 由 1h 聚合；国内期货 4h 由 60m 聚合。
+- 默认只分析 BTC/ETH；其他标的按需拉取，设置中可选最大同时分析数（默认 6，上限 24）。
+
+### 分析引擎
+- 新增 `nakedk/analysis.py`：单一分析路径，输出多周期 chart-ready payload。
+- 新增 `nakedk/multi.py`：4h + 15m 联合研判；冲突降中性、4h 否决、置信度上限。
+- 新增 `nakedk/symbol_params.py`：按标的独立参数库（JSON），带硬边界、版本、来源与回滚。
+- 新增 `nakedk/plans.py`：计划状态机 armed → triggered → confirmed → managing → closed/void；纯函数、幂等键。
+- 新增 `beagle/engine.py`：analysis / trigger 双循环；到价触发后自动重算并执行确认门；到价邻近关键位自动再分析；LLM 参数迭代受样本量与边界约束。
+- `beagle/store.py` 新增 plans / plan_events / outbox 三表；`beagle/push.py` 新增 outbox 投递。
+- 新增 `nakedk/llm.py`：OpenAI 兼容、无 key 自动关闭、评论与受限参数建议，缓存与边界校验。
+
+### 工程
+- 测试 237（+33）：计划状态机、多周期组合、标注几何、标的参数库、计划持久化/触发循环、引擎计划构建。
+- README 重写为 v2.0 架构文档；仪表盘截图更新。
+- 仍保持零第三方依赖、本地 vendor 图表、水印与许可证。
+
 ## 1.1.0 — 2026-11-06
 
 准确度审计 + 引擎门禁 + 知识库全覆盖。

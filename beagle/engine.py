@@ -1,0 +1,589 @@
+# -----------------------------------------------------------------
+# beagle/engine.py - naked-k-analysis automated analysis + trigger engine
+# (c) 2026 William-Trader (https://github.com/William-Trader)
+# WM: NKA-08D00909
+# SPDX-License-Identifier: LicenseRef-NKA-Personal-1.0
+# Removing this mark violates the license.
+# -----------------------------------------------------------------
+# -*- coding: utf-8 -*-
+"""Automation loop: analyse -> arm a plan -> watch price -> confirm -> push.
+
+Runtime split
+-------------
+analysis  every N minutes (or on demand): recompute features, refresh plans
+trigger   every ~20s: compare the last price with open plans only (no features)
+push      drain the outbox after each transition
+
+The trigger loop never recomputes features. When price reaches a trigger the
+engine immediately runs one full analysis of that symbol and applies the
+confirmation gate (structure / MTF / regime / volume). That "re-think on
+arrival" is deliberate: a price touch alone is not a trade.
+"""
+from __future__ import annotations
+
+import json
+import os
+import threading
+import time
+
+from nakedk import analysis, llm, plans as planlib, symbol_params
+from nakedk.fetch import klines
+from nakedk.markets import meta
+
+from . import push, store
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SETTINGS_PATH = os.environ.get("NK_SETTINGS", os.path.join(ROOT, "state", "settings.json"))
+TUNE_PATH = os.environ.get("NK_LLM_TUNE", os.path.join(ROOT, "state", "llm_tune.json"))
+DB_PATH = os.environ.get("BEAGLE_DB", os.path.join(ROOT, "beagle.db"))
+_LOCK = threading.RLock()
+
+DEFAULTS = {
+    "active_symbols": ["BTCUSDT", "ETHUSDT"],
+    "max_symbols": 6,
+    "mode": "multi",                 # multi | single
+    "intervals": ["4h", "15m"],
+    "single_interval": "4h",
+    "auto_analyze": True,
+    "auto_trigger": True,
+    "auto_push": False,              # QQ delivery is opt-in
+    "llm_annotate": True,
+    "llm_autotune": False,
+    "analysis_ttl_min": 30,
+    "trigger_seconds": 20,
+    "max_open_plans": 2,
+    "level_proximity_atr": 0.35,
+    "push_severity": ["confirmed", "tp1", "tp2", "stopped", "invalidated"],
+}
+
+_LAST_ANALYSIS = {}
+_LAST_PAYLOAD = {}
+
+
+# ---------------------------------------------------------------------------
+# settings
+# ---------------------------------------------------------------------------
+
+def load_settings(path=None) -> dict:
+    p = path or SETTINGS_PATH
+    s = json.loads(json.dumps(DEFAULTS))
+    try:
+        with open(p, encoding="utf-8") as fh:
+            user = json.load(fh)
+        if isinstance(user, dict):
+            for k, v in user.items():
+                if k in s:
+                    s[k] = v
+    except Exception:
+        pass
+    return _sanitise(s)
+
+
+def save_settings(patch: dict, path=None) -> dict:
+    p = path or SETTINGS_PATH
+    with _LOCK:
+        s = load_settings(p)
+        for k, v in (patch or {}).items():
+            if k in DEFAULTS:
+                s[k] = v
+        s = _sanitise(s)
+        try:
+            os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+            tmp = p + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as fh:
+                json.dump(s, fh, ensure_ascii=False, indent=2)
+            os.replace(tmp, p)
+        except Exception:
+            pass
+        return s
+
+
+def _sanitise(s: dict) -> dict:
+    syms = [str(x).strip().upper() for x in (s.get("active_symbols") or [])
+            if str(x).strip()]
+    syms = list(dict.fromkeys(syms))
+    mx = max(1, min(24, int(s.get("max_symbols") or 6)))
+    s["max_symbols"] = mx
+    s["active_symbols"] = syms[:mx]
+    ivs = [x for x in (s.get("intervals") or []) if x in ("1d", "4h", "1h", "30m", "15m")]
+    if not ivs:
+        ivs = ["4h", "15m"]
+    s["mode"] = "single" if s.get("mode") == "single" else "multi"
+    s["intervals"] = ivs if s["mode"] == "multi" else [s.get("single_interval") or "4h"]
+    s["single_interval"] = s.get("single_interval") or "4h"
+    s["analysis_ttl_min"] = max(2, min(240, int(s.get("analysis_ttl_min") or 30)))
+    s["trigger_seconds"] = max(5, min(300, int(s.get("trigger_seconds") or 20)))
+    s["max_open_plans"] = max(1, min(8, int(s.get("max_open_plans") or 2)))
+    return s
+
+
+def intervals_for(s: dict) -> list:
+    if s.get("mode") == "single":
+        return [s.get("single_interval") or "4h"]
+    return list(s.get("intervals") or ["4h", "15m"])
+
+
+# ---------------------------------------------------------------------------
+# plan construction from analysis
+# ---------------------------------------------------------------------------
+
+def _choose_trigger(side: str, primary: dict, price: float, atr: float,
+                    max_atr: float) -> tuple:
+    """Pick a pullback level; fall back to market when no level is near."""
+    f = primary.get("features") or {}
+    st = primary.get("structure") or {}
+    levels = st.get("levels") or {}
+    cands = []
+    if f.get("ema20"):
+        cands.append(float(f["ema20"]))
+    if side == "long":
+        sw = levels.get("swing_low")
+        if sw:
+            cands.append(float(sw) + 0.15 * atr)
+    else:
+        sw = levels.get("swing_high")
+        if sw:
+            cands.append(float(sw) - 0.15 * atr)
+    is_long = side == "long"
+    valid = []
+    for c in cands:
+        dist = (price - c) if is_long else (c - price)
+        if -0.05 * atr <= dist <= max_atr * atr:
+            valid.append(c)
+    if not valid:
+        return round(price, 6), "market"
+    trig = max(valid) if is_long else min(valid)
+    return round(trig, 6), planlib.trigger_mode(price, trig)
+
+
+def build_plan(symbol: str, payload: dict, params: dict, settings: dict,
+               now_ms: int | None = None):
+    """Derive an armed plan from a finished analysis payload."""
+    combined = payload.get("combined") or {}
+    side = combined.get("direction")
+    if side not in ("long", "short"):
+        return None
+    if (combined.get("confidence") or 0) < float(params.get("plan_min_confidence", 52)):
+        return None
+    primary = (payload.get("intervals") or {}).get("4h") or \
+        (payload.get("intervals") or {}).get((payload.get("interval_order") or ["4h"])[0]) or {}
+    price = primary.get("price") or payload.get("price")
+    atr = ((primary.get("features") or {}).get("atr"))
+    st = primary.get("stance") or {}
+    if not price or not atr or not st.get("target"):
+        return None
+    max_atr = float(params.get("plan_trigger_max_atr", 1.5))
+    trigger, mode = _choose_trigger(side, primary, float(price), float(atr), max_atr)
+    stop_atr = float(params.get("stance_stop_atr", 1.5))
+    target_atr = float(params.get("stance_target_atr", 3.0))
+    swing = (primary.get("structure") or {}).get("levels") or {}
+    if side == "long":
+        stop = trigger - stop_atr * atr
+        sl = swing.get("swing_low")
+        if sl and float(sl) < trigger and (trigger - float(sl)) < 2.2 * atr:
+            stop = min(stop, float(sl) - 0.1 * atr)
+        target1 = trigger + target_atr * atr
+        target2 = trigger + 2 * target_atr * atr
+        if st.get("target") and float(st["target"]) > target1:
+            target1 = float(st["target"])
+    else:
+        stop = trigger + stop_atr * atr
+        sh = swing.get("swing_high")
+        if sh and float(sh) > trigger and (float(sh) - trigger) < 2.2 * atr:
+            stop = max(stop, float(sh) + 0.1 * atr)
+        target1 = trigger - target_atr * atr
+        target2 = trigger - 2 * target_atr * atr
+        if st.get("target") and float(st["target"]) < target1:
+            target1 = float(st["target"])
+    pat = primary.get("primary_pattern") or {}
+    if pat.get("target") and ((side == "long" and pat["target"] > price)
+                              or (side == "short" and pat["target"] < price)):
+        target1 = float(pat["target"])
+    setup = (pat.get("type") or "structure")
+    snap = {
+        "combined": combined,
+        "mtf": payload.get("mtf"),
+        "structure": primary.get("structure"),
+        "features": primary.get("features"),
+        "primary_pattern": pat,
+        "reasons": st.get("reasons") or [],
+    }
+    invalidation = ("4h 收盘跌破 %.4f" % stop) if side == "long" else \
+                   ("4h 收盘突破 %.4f" % stop)
+    return planlib.build(
+        symbol, primary.get("interval") or "4h", side,
+        price=float(price), atr=float(atr), trigger=trigger, stop=stop,
+        target1=target1, target2=target2, setup=setup,
+        confidence=combined.get("confidence") or 50,
+        grade=combined.get("grade") or "C", snapshot=snap,
+        ttl_h=float(params.get("plan_ttl_h", 12)),
+        params_version=int(payload.get("params_version") or 0),
+        invalidation=invalidation, now_ms=now_ms,
+        min_rr=float(params.get("plan_min_rr", 1.5)))
+
+
+def _plan_text(plan: dict, event: dict, payload: dict | None = None) -> str:
+    side = planlib.SIDE_CN.get(plan.get("side"), plan.get("side"))
+    typ = event.get("type")
+    head = {
+        "confirmed": "触发确认 · 可执行",
+        "tp1": "目标一达成 · 减仓/移保本",
+        "tp2": "目标二达成 · 了结",
+        "stopped": "止损离场",
+        "invalidated": "结构失效 · 放弃",
+        "expired": "计划超时作废",
+        "triggered": "进入触发区 · 等待确认",
+    }.get(typ, typ)
+    price = event.get("price")
+    lines = ["%s · %s · %s" % (str(plan.get("symbol", "")).replace("USDT", ""),
+                               plan.get("interval"), side),
+             "状态：%s" % head]
+    if price:
+        lines.append("价格：%.4f" % float(price))
+    lines.append("触发 %.4f / 止损 %.4f / 目标 %.4f%s" % (
+        float(plan.get("trigger") or 0), float(plan.get("stop") or 0),
+        float(plan.get("target1") or 0),
+        (" / %.4f" % float(plan["target2"])) if plan.get("target2") else ""))
+    lines.append("R:R %s · 置信 %s(%s) · %s" % (
+        plan.get("rr"), plan.get("confidence"), plan.get("grade"),
+        planlib.TYPE_CN.get(plan.get("status"), plan.get("status"))))
+    if event.get("reason"):
+        lines.append("原因：%s" % event["reason"])
+    if payload:
+        m = payload.get("mtf") or {}
+        lines.append("周期：%s · 结构 %s" % (
+            m.get("label") or "—",
+            ((payload.get("intervals") or {}).get("4h") or {}).get(
+                "structure", {}).get("state") or "—"))
+        data_ts = payload.get("data_ts")
+        if data_ts:
+            lines.append("数据：%s · %s" % (
+                payload.get("source") or "—",
+                time.strftime("%m-%d %H:%M", time.localtime(data_ts / 1000))))
+    lines.append("失效：%s" % (plan.get("invalidation") or "结构破坏"))
+    lines.append("非投资建议")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# analysis + plan refresh
+# ---------------------------------------------------------------------------
+
+def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_PATH,
+                   force_plan: bool = True) -> dict:
+    s = settings or load_settings()
+    ivs = intervals_for(s)
+    prof = symbol_params.profile(symbol)
+    params = symbol_params.get(symbol)
+    payload = analysis.analyze_symbol(symbol, ivs, params, prof.get("version") or 0)
+    _LAST_ANALYSIS[symbol] = int(time.time() * 1000)
+    _LAST_PAYLOAD[symbol] = payload
+    if not force_plan:
+        payload["plan"] = store.active_plan(db_path, symbol)
+        return payload
+
+    active = store.active_plan(db_path, symbol)
+    cand = build_plan(symbol, payload, params, s)
+    now = int(time.time() * 1000)
+    plan = active
+    if cand:
+        if active and active.get("status") in ("armed",) and \
+                active.get("side") == cand.get("side"):
+            # refresh levels in place, keep the same lifecycle
+            for k in ("trigger", "trigger_mode", "stop", "target1", "target2",
+                      "confidence", "grade", "rr", "invalidation", "ttl_at",
+                      "snapshot", "atr", "setup"):
+                active[k] = cand.get(k)
+            active["updated_at"] = now
+            active["version"] = int(active.get("version") or 1) + 1
+            plan = store.save_plan(db_path, active)
+        elif not active:
+            plan = store.save_plan(db_path, cand)
+            ev = {"type": "armed", "price": cand.get("entry_ref"),
+                  "ts": now, "plan_id": plan["id"], "symbol": symbol,
+                  "side": cand["side"], "to_status": "armed"}
+            eid = store.add_plan_event(db_path, plan, ev,
+                                       planlib.event_key(plan, ev))
+            if eid and "armed" in (s.get("push_severity") or []):
+                store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+        else:
+            plan = active
+    elif active and active.get("status") == "armed":
+        combined = payload.get("combined") or {}
+        if combined.get("direction") not in (None, "neutral", active.get("side")):
+            ev = {"type": "invalidated", "price": payload.get("price"),
+                  "ts": now, "reason": "分析方向翻转", "to_status": "void",
+                  "outcome": "invalidated"}
+            plan = planlib.apply(active, ev)
+            plan = store.save_plan(db_path, plan)
+            eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
+            if eid:
+                store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+    payload["plan"] = planlib.describe(plan) if plan else None
+    payload["params"] = params
+    payload["params_profile"] = {"version": prof.get("version") or 0,
+                                 "source": prof.get("source") or "default"}
+    return payload
+
+
+def _confirm_payload(symbol: str, settings: dict, db_path: str) -> dict:
+    """Full re-analysis used by the confirmation gate."""
+    prof = symbol_params.profile(symbol)
+    params = symbol_params.get(symbol)
+    return analysis.analyze_symbol(symbol, intervals_for(settings), params,
+                                   prof.get("version") or 0)
+
+
+def _ctx_from(payload: dict, plan: dict) -> dict:
+    primary = (payload.get("intervals") or {}).get(plan.get("interval") or "4h") or {}
+    f = primary.get("features") or {}
+    return {
+        "structure_direction": (primary.get("structure") or {}).get("state"),
+        "htf_direction": ((payload.get("intervals") or {}).get("1d") or {}).get(
+            "structure", {}).get("state"),
+        "mtf_alignment": (payload.get("mtf") or {}).get("alignment"),
+        "regime": (primary.get("regime") or {}).get("regime")
+        or (primary.get("regime") or {}).get("state"),
+        "vol_z": f.get("vol_z"),
+        "overlap": f.get("overlap"),
+    }
+
+
+def refresh_plan(symbol: str, settings: dict | None = None,
+                 db_path: str = DB_PATH) -> dict | None:
+    """Re-analysis + confirmation for a plan already in `triggered`."""
+    s = settings or load_settings()
+    plan = store.active_plan(db_path, symbol)
+    if not plan or plan.get("status") != "triggered":
+        return plan
+    payload = _confirm_payload(symbol, s, db_path)
+    dec = planlib.confirm(plan, _ctx_from(payload, plan))
+    now = int(time.time() * 1000)
+    if dec["ok"]:
+        ev = {"type": "confirmed", "price": payload.get("price"), "ts": now,
+              "to_status": "confirmed", "reason": "上下文确认"}
+        plan = planlib.apply(plan, ev)
+        plan = store.save_plan(db_path, plan)
+        eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
+        if eid and "confirmed" in (s.get("push_severity") or []):
+            store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+    else:
+        ev = {"type": "invalidated", "price": payload.get("price"), "ts": now,
+              "to_status": "void", "outcome": "invalidated",
+              "reason": "；".join(dec["reasons"])[:180]}
+        plan = planlib.apply(plan, ev)
+        plan = store.save_plan(db_path, plan)
+        eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
+        if eid and "invalidated" in (s.get("push_severity") or []):
+            store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+    return plan
+
+
+# ---------------------------------------------------------------------------
+# trigger loop
+# ---------------------------------------------------------------------------
+
+def last_price(symbol: str) -> float | None:
+    """Last traded price with one cheap request (2 bars)."""
+    try:
+        rows = klines(symbol, "15m", 3)
+        return float(rows[-1][4]) if rows else None
+    except Exception:
+        return None
+
+
+def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
+    s = settings or load_settings()
+    if not s.get("auto_trigger"):
+        return []
+    events = []
+    open_plans = store.open_plans(db_path)
+    if not open_plans:
+        return events
+    prices = {}
+    for plan in open_plans:
+        sym = plan.get("symbol")
+        if sym not in prices:
+            prices[sym] = last_price(sym)
+        price = prices.get(sym)
+        if price is None:
+            continue
+        ev = planlib.evaluate(plan, price)
+        if not ev:
+            continue
+        ev["plan_id"] = plan.get("id")
+        if ev["type"] == "triggered":
+            updated = planlib.apply(plan, ev)
+            updated = store.save_plan(db_path, updated)
+            eid = store.add_plan_event(db_path, updated, ev,
+                                       planlib.event_key(updated, ev))
+            events.append(ev)
+            # "think on arrival": full re-analysis + confirmation gate
+            try:
+                confirm_plan = refresh_plan(sym, s, db_path)
+                if confirm_plan:
+                    events.append({"type": "confirm_result",
+                                   "status": confirm_plan.get("status"),
+                                   "plan_id": confirm_plan.get("id")})
+            except Exception as e:
+                events.append({"type": "confirm_error", "error": str(e)[:160]})
+        else:
+            updated = planlib.apply(plan, ev)
+            updated = store.save_plan(db_path, updated)
+            eid = store.add_plan_event(db_path, updated, ev,
+                                       planlib.event_key(updated, ev))
+            events.append(ev)
+            push_type = {"tp2": "tp2", "tp1": "tp1", "stopped": "stopped",
+                         "expired": "expired", "invalidated": "invalidated",
+                         "void": "invalidated"}.get(ev["type"], ev["type"])
+            if eid and push_type in (s.get("push_severity") or []):
+                store.outbox_add(db_path, eid, "qq", _plan_text(updated, ev))
+    if events and s.get("auto_push"):
+        try:
+            push.push_outbox(db_path, s)
+        except Exception:
+            pass
+    return events
+
+
+def level_watch(settings: dict | None = None, db_path: str = DB_PATH,
+                cooldown_ms: int = 300_000) -> list:
+    """Re-analyse when price arrives at a level that matters.
+
+    This is the "到达价位自动进行下一次分析" rule. It only fires when the last
+    price is within (level_proximity_atr x ATR) of a support / resistance,
+    pattern neckline or measured target, with a per-symbol cooldown so a
+    slow trend cannot turn into a request storm.
+    """
+    s = settings or load_settings()
+    if not s.get("auto_analyze"):
+        return []
+    now = int(time.time() * 1000)
+    fired = []
+    prox = float(s.get("level_proximity_atr") or 0.35)
+    for sym in s.get("active_symbols") or []:
+        p = _LAST_PAYLOAD.get(sym)
+        if not p or now - _LAST_ANALYSIS.get(sym, 0) < cooldown_ms:
+            continue
+        price = p.get("price")
+        primary = (p.get("intervals") or {}).get("4h") or next(
+            iter((p.get("intervals") or {}).values()), None)
+        if not price or not primary:
+            continue
+        f = primary.get("features") or {}
+        atr = float(f.get("atr") or 0)
+        if not atr:
+            continue
+        levels = []
+        ann = primary.get("annotations") or {}
+        for grp in (ann.get("levels") or {}).values():
+            for x in grp or []:
+                if x.get("price"):
+                    levels.append(float(x["price"]))
+        for pat in ann.get("patterns") or []:
+            for ln in pat.get("lines") or []:
+                if ln.get("price"):
+                    levels.append(float(ln["price"]))
+        if not levels:
+            continue
+        near = [x for x in levels if abs(x - float(price)) <= prox * atr]
+        if not near:
+            continue
+        try:
+            analyze_symbol(sym, s, db_path)
+            fired.append({"symbol": sym, "price": price,
+                          "level": min(near, key=lambda x: abs(x - float(price)))})
+        except Exception:
+            continue
+    return fired
+
+
+def analysis_loop(settings: dict | None = None, db_path: str = DB_PATH):
+    s = settings or load_settings()
+    now = int(time.time() * 1000)
+    ttl = int(s.get("analysis_ttl_min") or 30) * 60_000
+    for sym in s.get("active_symbols") or []:
+        if now - _LAST_ANALYSIS.get(sym, 0) >= ttl:
+            try:
+                analyze_symbol(sym, s, db_path)
+            except Exception:
+                continue
+
+
+def maybe_autotune(settings: dict | None = None, db_path: str = DB_PATH):
+    """LLM parameter proposal, only with enough closed samples and hard bounds."""
+    s = settings or load_settings()
+    if not s.get("llm_autotune") or not llm.status().get("enabled"):
+        return []
+    applied = []
+    state = _read_json(TUNE_PATH)
+    for sym in s.get("active_symbols") or []:
+        stats = store.plan_stats(db_path, sym)
+        if (stats.get("total") or 0) < 20 or (stats.get("closed") or 0) < 10:
+            continue
+        if time.time() * 1000 - int(state.get(sym) or 0) < 24 * 3600_000:
+            continue
+        prof = symbol_params.profile(sym)
+        payload = {
+            "symbol": sym,
+            "current_params": {k: prof["effective"].get(k) for k in symbol_params.BOUNDS},
+            "stats": stats,
+            "recent_events": store.plan_events(db_path, None, 40),
+        }
+        res = llm.propose_params(payload, symbol_params.BOUNDS, symbol_params.BOUNDS)
+        patch = res.get("patch") or {}
+        errs = symbol_params.validate_patch(patch)
+        if not patch or errs or len(patch) > 2:
+            state[sym] = int(time.time() * 1000)
+            _write_json(TUNE_PATH, state)
+            continue
+        symbol_params.save(sym, patch, source="llm",
+                           note=(res.get("rationale") or "")[:180])
+        state[sym] = int(time.time() * 1000)
+        _write_json(TUNE_PATH, state)
+        applied.append({"symbol": sym, "patch": patch,
+                        "rationale": res.get("rationale")})
+    return applied
+
+
+def _read_json(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _write_json(path, data):
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def run_forever(db_path: str = DB_PATH, stop_event: threading.Event | None = None):
+    """Standalone worker (python -m beagle.engine)."""
+    store.init(db_path)
+    last_analysis = 0
+    while not (stop_event and stop_event.is_set()):
+        s = load_settings()
+        try:
+            if time.time() * 1000 - last_analysis > 60_000:
+                analysis_loop(s, db_path)
+                level_watch(s, db_path)
+                maybe_autotune(s, db_path)
+                last_analysis = int(time.time() * 1000)
+            tick(s, db_path)
+            if s.get("auto_push"):
+                push.push_outbox(db_path, s)
+        except Exception:
+            pass
+        time.sleep(int(s.get("trigger_seconds") or 20))
+
+
+if __name__ == "__main__":
+    store.init(DB_PATH)
+    run_forever(DB_PATH)
