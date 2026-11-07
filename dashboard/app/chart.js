@@ -1,4 +1,5 @@
 import { fmtPrice, pct, colorOf } from './format.js';
+import { createDrawings } from './drawing.js';
 
 const C = {
   up: '#ff5b6e', down: '#22c77a', gold: '#e0b968', blue: '#4f9cf9',
@@ -12,6 +13,7 @@ let payload = null, interval = '4h';
 let layers = { structure: true, patterns: true, zones: true, plan: true };
 let lastKey = '';
 let ro = null;
+let drawings = null;
 
 function autoFmt(p) {
   if (p === null || p === undefined) return '';
@@ -91,6 +93,15 @@ export function initChart() {
   ro = new ResizeObserver(() => { sizeCanvas(); redraw(); });
   ro.observe(wrap);
   window.addEventListener('resize', () => { sizeCanvas(); redraw(); });
+  drawings = createDrawings({
+    chart, series: candles, overlay, wrap, ctx,
+    toX: X, toY: Y, rightEdge,
+    redraw: () => redraw(),
+    getBars: () => {
+      const iv = payload && payload.intervals && payload.intervals[interval];
+      return (iv && iv.candles) || [];
+    }
+  });
   sizeCanvas();
   updateLayers(layers);
 }
@@ -141,6 +152,7 @@ export function setPayload(p, tf) {
     color: k.c >= k.o ? 'rgba(255,91,110,.26)' : 'rgba(34,199,122,.22)'
   })));
   updateOHLC(null);
+  if (drawings) drawings.setSymbol(payload.symbol, interval);
   if (first) {
     chart.timeScale().fitContent();
     // show the most recent ~140 bars, not the whole history
@@ -394,6 +406,8 @@ export function redraw() {
     ctx.fillText('计划已结束 · ' + (plan.status_cn || plan.status), 12, 34);
     ctx.restore();
   }
+
+  if (drawings) drawings.render(ctx);
 
   // ---------- pivot labels ----------
   if (layers.structure) {

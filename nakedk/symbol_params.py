@@ -47,6 +47,8 @@ BOUNDS = {
     "plan_min_confidence": (45.0, 68.0),
     "plan_min_rr": (1.2, 3.0),
     "plan_ttl_h": (4, 48),
+    "plan_risk_pct": (0.1, 2.0),
+    "plan_min_confluence": (30.0, 80.0),
 }
 
 # extra plan-level keys are not part of nakedk.params.DEFAULTS
@@ -57,6 +59,8 @@ PLAN_DEFAULTS = {
     "plan_trigger_max_atr": 1.5,
     "plan_confirm_bars": 3,
     "plan_max_open": 2,
+    "plan_risk_pct": 0.5,
+    "plan_min_confluence": 40.0,
 }
 
 _LOCK = threading.RLock()

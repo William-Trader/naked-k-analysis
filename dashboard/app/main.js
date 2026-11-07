@@ -169,6 +169,9 @@ async function switchSymbol(sym) {
 }
 
 function setIntervalTF(tf) {
+  const p = state.symbols[state.active];
+  const order = (p && p.interval_order) || (state.settings.intervals || []);
+  if (order.length && !order.includes(tf)) return;
   state.interval = tf;
   setHash();
   render(state);
@@ -285,12 +288,20 @@ function renderTop(st, p) {
     $('last-chg').style.color = colorOf(p.change24h);
     $('freshness').textContent = `${p.source || '—'} · 数据 ${timeHM(p.data_ts)} · 分析 ${timeHM(p.as_of)}`;
   }
-  document.querySelectorAll('#tf-rail button').forEach(b => {
-    b.classList.toggle('on', b.dataset.tf === st.interval);
-  });
+  renderTF(st, p);
   const live = $('live');
   live.classList.toggle('ok', !!st.connected);
   live.querySelector('span').textContent = st.connected ? '实时' : '轮询';
+}
+
+function renderTF(st, p) {
+  const order = (p && p.interval_order) || (st.settings && st.settings.intervals) || ['15m', '4h'];
+  const rail = $('tf-rail');
+  if (!rail) return;
+  if (!order.includes(st.interval) && order.length) state.interval = order[0];
+  rail.innerHTML = order.map(tf =>
+    `<button data-tf="${tf}" class="${tf === st.interval ? 'on' : ''}">${tf.toUpperCase()}</button>`
+  ).join('');
 }
 
 function renderStatus(st, p) {
