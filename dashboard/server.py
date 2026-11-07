@@ -48,6 +48,8 @@ _lock = threading.Lock()
 _exec = ThreadPoolExecutor(max_workers=8, thread_name_prefix="nk-api")
 _subs = []
 _subs_lock = threading.Lock()
+_LAST_AUTO_AT = 0
+_AUTO_RUNS = 0
 
 STATIC_TYPES = {
     ".js": "application/javascript; charset=utf-8",
@@ -175,6 +177,8 @@ def api_health():
         "auto_push": s.get("auto_push"),
         "llm": llm.status(),
         "cache": sorted(_cache.keys()),
+        "last_auto_analysis": _LAST_AUTO_AT,
+        "auto_runs": _AUTO_RUNS,
     }
 
 
@@ -597,12 +601,15 @@ class EngineThread(threading.Thread):
             try:
                 now = int(time.time() * 1000)
                 if s.get("auto_analyze") and now - last_analysis > 120_000:
+                    global _LAST_AUTO_AT, _AUTO_RUNS
                     for sym in s.get("active_symbols") or []:
                         try:
                             _build(sym, force=True)
                         except Exception:
                             pass
                     last_analysis = now
+                    _LAST_AUTO_AT = int(time.time() * 1000)
+                    _AUTO_RUNS += 1
                 if s.get("auto_analyze"):
                     engine.level_watch(s, DB)
                 if s.get("auto_trigger"):
