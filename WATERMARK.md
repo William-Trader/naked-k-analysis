@@ -24,6 +24,7 @@
 | scripts/pa_run.sh | NKA-B3E5AC11 |
 | scripts/accuracy_audit.py | NKA-2B092075 |
 | scripts/knowledge_coverage.py | NKA-389AFEB5 |
+| scripts/llm_check.py | NKA-F5B11130 |
 
 | nakedk/analysis.py | NKA-D97BF60A |
 | nakedk/annotations.py | NKA-3DC589D6 |
@@ -33,4 +34,4 @@
 | nakedk/llm.py | NKA-3CB98FE9 |
 | beagle/engine.py | NKA-08D00909 |
 
-**Total marked files: 25**
+**Total marked files: 26**

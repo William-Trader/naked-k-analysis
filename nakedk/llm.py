@@ -8,10 +8,19 @@
 # -*- coding: utf-8 -*-
 """Optional LLM layer: chart commentary and guarded parameter proposals.
 
+Configuration (highest priority first)
+--------------------------------------
+1. environment: NK_LLM_BASE / NK_LLM_MODEL / NK_LLM_KEY
+2. JSON file: NK_LLM_CONFIG, else config/llm.local.json
+3. built-in defaults (OpenAI-compatible endpoint)
+
+The JSON file never needs to contain a key: point ``api_key_env`` at the
+environment variable that holds it. A localhost endpoint (Ollama / vLLM)
+does not require a key at all.
+
 Design rules
 ------------
-* No third-party SDK: a plain OpenAI-compatible /chat/completions call with
-  urllib. Works with OpenAI, DeepSeek, Moonshot, vLLM, Ollama gateways.
+* No third-party SDK: plain OpenAI-compatible /chat/completions with urllib.
 * No key = disabled, not broken. Every caller gets {"enabled": false}.
 * The LLM never computes prices. It receives the deterministic engine output
   and may only (a) write commentary, (b) propose parameter deltas inside the
@@ -29,12 +38,13 @@ import threading
 import time
 import urllib.request
 
-BASE = os.environ.get("NK_LLM_BASE", "https://api.openai.com/v1").rstrip("/")
-KEY = os.environ.get("NK_LLM_KEY") or os.environ.get("OPENAI_API_KEY") or ""
-MODEL = os.environ.get("NK_LLM_MODEL", "gpt-4o-mini")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DEFAULT_BASE = "https://api.openai.com/v1"
+DEFAULT_MODEL = "gpt-4o-mini"
+CONFIG_PATH = os.environ.get("NK_LLM_CONFIG") or os.path.join(
+    ROOT, "config", "llm.local.json")
 CACHE_PATH = os.environ.get("NK_LLM_CACHE", os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "state", "llm_cache.json"))
+    ROOT, "state", "llm_cache.json"))
 _LOCK = threading.RLock()
 
 ANNOTATE_SYSTEM = (
@@ -54,13 +64,66 @@ TUNE_SYSTEM = (
 )
 
 
-def status() -> dict:
+def _read_config(path=None):
+    p = path or os.environ.get("NK_LLM_CONFIG") or CONFIG_PATH
+    try:
+        with open(p, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return (data if isinstance(data, dict) else {}), p
+    except Exception:
+        return {}, p
+
+
+def _settings(path=None) -> dict:
+    """Resolve effective settings without ever exposing the key."""
+    cfg, config_path = _read_config(path)
+    base = (os.environ.get("NK_LLM_BASE") or cfg.get("base") or DEFAULT_BASE).rstrip("/")
+    model = os.environ.get("NK_LLM_MODEL") or cfg.get("model") or DEFAULT_MODEL
+    key_env = (cfg.get("api_key_env") or "NK_LLM_KEY").strip()
+    key = os.environ.get("NK_LLM_KEY") or ""
+    if not key and key_env:
+        key = os.environ.get(key_env) or ""
+    if not key and cfg.get("api_key"):
+        key = str(cfg.get("api_key") or "")
+    local = base.startswith(("http://127.0.0.1", "http://localhost",
+                             "http://[::1]", "http://0.0.0.0"))
+    require_key = bool(cfg.get("require_key", not local))
+    configured_on = cfg.get("enabled", True) is not False
+    enabled = configured_on and (bool(key) or not require_key)
+    reason = None
+    if not configured_on:
+        reason = "配置中 enabled=false"
+    elif require_key and not key:
+        reason = "缺少环境变量 %s（或 NK_LLM_KEY）" % (key_env or "NK_LLM_KEY")
     return {
-        "enabled": bool(KEY),
-        "model": MODEL if KEY else None,
-        "base": BASE if KEY else None,
-        "features": ["chart_commentary", "guarded_param_tuning"] if KEY else [],
-        "reason": None if KEY else "未配置 NK_LLM_KEY（设置环境变量后启用）",
+        "enabled": enabled,
+        "base": base,
+        "model": model,
+        "key": key,
+        "key_env": key_env,
+        "requires_key": require_key,
+        "local": local,
+        "config_path": config_path,
+        "config_exists": os.path.exists(config_path),
+        "timeout": int(cfg.get("timeout") or 45),
+        "reason": reason,
+    }
+
+
+def status() -> dict:
+    s = _settings()
+    return {
+        "enabled": bool(s["enabled"]),
+        "model": s["model"] if s["enabled"] else None,
+        "base": s["base"] if s["enabled"] else None,
+        "features": ["chart_commentary", "guarded_param_tuning"]
+        if s["enabled"] else [],
+        "reason": s["reason"],
+        "config_path": s["config_path"],
+        "config_exists": s["config_exists"],
+        "key_env": s["key_env"],
+        "requires_key": s["requires_key"],
+        "local": s["local"],
     }
 
 
@@ -72,18 +135,22 @@ def _post(url, payload, headers, timeout):
         return json.loads(r.read().decode("utf-8"))
 
 
-def chat(messages, max_tokens=700, temperature=0.2, timeout=45):
-    if not KEY:
-        return {"enabled": False, "error": "llm_disabled"}
-    payload = {"model": MODEL, "messages": messages,
+def chat(messages, max_tokens=700, temperature=0.2, timeout=None):
+    s = _settings()
+    if not s["enabled"]:
+        return {"enabled": False, "error": "llm_disabled", "reason": s["reason"]}
+    headers = {}
+    if s["key"]:
+        headers["Authorization"] = "Bearer " + s["key"]
+    payload = {"model": s["model"], "messages": messages,
                "temperature": temperature, "max_tokens": max_tokens}
     try:
-        data = _post(BASE + "/chat/completions", payload,
-                     {"Authorization": "Bearer " + KEY}, timeout)
+        data = _post(s["base"] + "/chat/completions", payload, headers,
+                     timeout or s["timeout"])
         content = (((data.get("choices") or [{}])[0].get("message") or {})
                    .get("content") or "")
         return {"enabled": True, "content": content,
-                "model": data.get("model") or MODEL,
+                "model": data.get("model") or s["model"],
                 "usage": data.get("usage") or {}}
     except Exception as e:
         return {"enabled": True, "error": str(e)[:300]}
@@ -150,8 +217,9 @@ def _cache_put(key, value):
 
 def annotate(payload, use_cache=True):
     """LLM commentary for one symbol/interval. Never raises."""
-    if not KEY:
-        return {"enabled": False, "reason": "llm_disabled"}
+    s = _settings()
+    if not s["enabled"]:
+        return {"enabled": False, "reason": s["reason"], "error": "llm_disabled"}
     key = _cache_key("annotate", payload)
     if use_cache:
         hit = _cache_get(key)
@@ -182,8 +250,9 @@ def annotate(payload, use_cache=True):
 
 def propose_params(payload, allowed: dict, bounds: dict, use_cache=False):
     """Ask for a small, bounded parameter patch. Caller still validates."""
-    if not KEY:
-        return {"enabled": False, "reason": "llm_disabled"}
+    s = _settings()
+    if not s["enabled"]:
+        return {"enabled": False, "reason": s["reason"], "error": "llm_disabled"}
     key = _cache_key("tune", payload)
     if use_cache:
         hit = _cache_get(key)
@@ -212,3 +281,9 @@ def propose_params(payload, allowed: dict, bounds: dict, use_cache=False):
     }
     _cache_put(key, out)
     return {"enabled": True, "cached": False, **out}
+
+
+def probe():
+    """One cheap round-trip used by scripts/llm_check.py."""
+    return chat([{"role": "user", "content": "只回复 OK"}], max_tokens=8,
+                temperature=0)

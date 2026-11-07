@@ -1,0 +1,9 @@
+{
+  "_comment": "复制为 config/llm.local.json 后使用；key 只放环境变量，不写进本文件。",
+  "base": "https://api.deepseek.com/v1",
+  "model": "deepseek-chat",
+  "api_key_env": "DEEPSEEK_API_KEY",
+  "enabled": true,
+  "require_key": true,
+  "timeout": 45
+}
