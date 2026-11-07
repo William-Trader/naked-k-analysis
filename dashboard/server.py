@@ -95,7 +95,7 @@ def _payload(symbol, force=False):
         if age < STALE_TTL:
             _refresh(symbol)
             return c["data"]
-    return _build(symbol, now)
+    return _build(symbol, now, force=force)
 
 
 def _refresh(symbol):
