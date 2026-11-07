@@ -42,6 +42,14 @@ async function boot() {
     startStream();
     refreshTimer = setInterval(() => refreshActive(), 25000);
     render(state);
+    const qp = new URLSearchParams(location.search);
+    if (qp.get('llm') === '1' || qp.get('setup') === '1') {
+      await openSettings();
+      setTimeout(() => {
+        const el = document.getElementById('llm-key-input');
+        if (el) { el.focus(); el.scrollIntoView({ block: 'center' }); }
+      }, 200);
+    }
   } catch (e) {
     patch({ lastError: String(e) });
     $('chart-empty').hidden = false;
