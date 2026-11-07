@@ -23,6 +23,7 @@
 - 新增 `beagle/engine.py`：analysis / trigger 双循环；到价触发后自动重算并执行确认门；到价邻近关键位自动再分析；LLM 参数迭代受样本量与边界约束。
 - `beagle/store.py` 新增 plans / plan_events / outbox 三表；`beagle/push.py` 新增 outbox 投递。
 - 新增 `nakedk/llm.py`：OpenAI 兼容、无 key 自动关闭、评论与受限参数建议，缓存与边界校验。
+- 新增 `config/llm.example.json` + `config/llm.local.json`（本地被 gitignore）+ `docs/LLM.md` + `scripts/llm_check.py`；支持环境变量/配置文件/本地 Ollama 三种入口，状态接口不返回 key。
 
 ### 工程
 - 测试 237（+33）：计划状态机、多周期组合、标注几何、标的参数库、计划持久化/触发循环、引擎计划构建。

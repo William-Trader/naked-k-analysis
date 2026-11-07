@@ -15,3 +15,6 @@ state/
 ai_state.db
 patterns.db
 *.db
+
+# local LLM credentials/config (example file is tracked, local is not)
+config/llm.local.json

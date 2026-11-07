@@ -78,11 +78,13 @@ armed(待触发) -> triggered(到触发区) -> confirmed(确认) -> managing(持
 
 ### 6. LLM（可选，不参与定价）
 
-配置 `NK_LLM_KEY` 后启用 OpenAI 兼容接口：
+支持任意 OpenAI 兼容接口（DeepSeek / OpenAI / 通义千问 / Moonshot / Ollama / vLLM）。
 
+- **配置方式**：复制 `config/llm.example.json` 为 `config/llm.local.json`，把 `api_key_env` 指向保存 key 的环境变量；也可用 `NK_LLM_BASE` / `NK_LLM_MODEL` / `NK_LLM_KEY` 覆盖。详见 [docs/LLM.md](docs/LLM.md)。
 - **图表解读**：输入确定性引擎输出，输出一句话结论、情景、失效条件与风险提示；不生成价位。
 - **受限参数迭代**：仅在计划样本充足（总数 ≥20、已结束 ≥10）时提出 ≤2 个参数的小幅调整；越界、非数字、未知键一律拒绝；每天最多一次。
-- 未配置 key 时返回 `enabled:false`，系统完整可用。
+- **自检**：`python3 scripts/llm_check.py` 查看配置；加 `--ping` 做一次真实请求。
+- 未配置 key 时返回 `enabled:false`，系统完整可用；本地 Ollama 端点不要求 key。
 
 ### 7. 推送与实时
 
@@ -177,9 +179,10 @@ python3 -m unittest discover -s tests
 | `NK_SETTINGS` | 设置文件 | `<repo>/state/settings.json` |
 | `NK_SYMBOL_PROFILES` | 标的参数库 | `<repo>/state/symbol_profiles.json` |
 | `NK_DASH_TOKEN` | 可选 Bearer/查询 token | 空（不鉴权） |
+| `NK_LLM_CONFIG` | LLM 配置文件 | `config/llm.local.json` |
 | `NK_LLM_KEY` | LLM API key | 空（关闭） |
-| `NK_LLM_BASE` | OpenAI 兼容 base URL | `https://api.openai.com/v1` |
-| `NK_LLM_MODEL` | 模型名 | `gpt-4o-mini` |
+| `NK_LLM_BASE` | OpenAI 兼容 base URL | 配置文件 / `https://api.openai.com/v1` |
+| `NK_LLM_MODEL` | 模型名 | 配置文件 / `gpt-4o-mini` |
 | `BEAGLE_QQ_TARGET` | qqbot 推送目标 | 空（不推） |
 
 ---
