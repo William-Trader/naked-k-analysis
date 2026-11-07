@@ -172,14 +172,32 @@ function setIntervalTF(tf) {
   render(state);
 }
 
+let toastTimer = null;
+function toast(msg, kind = 'ok') {
+  const el = $('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'toast ' + kind;
+  el.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.hidden = true; }, 4500);
+}
+
 async function analyzeNow() {
   const btn = $('btn-reanalyze');
   if (btn) { btn.disabled = true; btn.textContent = '分析中…'; }
   try {
     const p = await post('/api/analyze', { symbol: state.active });
+    if (p && p.error) {
+      toast('分析失败：' + p.error, 'err');
+      return;
+    }
     patch({ symbols: Object.assign({}, state.symbols, { [state.active]: p }) });
+    const c = p.combined || {};
+    toast(`分析完成 · ${c.direction_cn || '中性'} · 置信 ${c.confidence ?? '—'} · ${new Date().toLocaleTimeString('zh-CN', {hour12:false})}`);
   } catch (e) {
     console.error(e);
+    toast('分析请求失败：' + e.message, 'err');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = '重新分析'; }
   }
