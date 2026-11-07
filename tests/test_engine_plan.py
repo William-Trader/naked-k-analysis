@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import unittest
 
+from beagle import engine
 from beagle.engine import build_plan
 
 
@@ -46,6 +47,56 @@ class BuildPlanTest(unittest.TestCase):
     def test_low_confidence_returns_none(self):
         params = {"plan_min_confidence": 52}
         self.assertIsNone(build_plan("BTCUSDT", payload(conf=45), params, {}))
+
+
+if __name__ == "__main__":
+    unittest.main()
+
+
+class AdviceTest(unittest.TestCase):
+    def plan(self):
+        return {
+            "symbol": "BTCUSDT", "interval": "4h", "side": "long",
+            "status": "confirmed", "trigger": 75600, "stop": 74900,
+            "target1": 76900, "target2": 77800, "rr": 2.1, "atr": 900,
+            "confidence": 58, "grade": "B",
+            "snapshot": {"reasons": ["EMA20 > EMA50"]},
+        }
+
+    def test_confirmed_advice_is_actionable(self):
+        a = engine.plan_advice(self.plan(), {"type": "confirmed", "price": 75650},
+                               {"name": "BTC/USDT", "price": 75650})
+        self.assertIn("可轻仓做多", a["action"])
+        self.assertIn("操作：", "\n".join(a["lines"]))
+        self.assertIn("BTC/USDT", a["headline"])
+
+    def test_far_from_trigger_does_not_chase(self):
+        a = engine.plan_advice(self.plan(), {"type": "confirmed", "price": 77000},
+                               {"name": "BTC/USDT", "price": 77000})
+        self.assertIn("不追", a["action"])
+
+    def test_tp1_and_stop_language(self):
+        tp1 = engine.plan_advice(self.plan(), {"type": "tp1", "price": 76900},
+                                 {"name": "BTC/USDT"})
+        self.assertIn("减仓 50%", tp1["action"])
+        stop = engine.plan_advice(self.plan(), {"type": "stopped", "price": 74890},
+                                  {"name": "BTC/USDT"})
+        self.assertIn("离场", stop["action"])
+
+    def test_plan_text_is_short_and_readable(self):
+        txt = engine._plan_text(self.plan(), {"type": "confirmed", "price": 75650},
+                                {"name": "BTC/USDT", "price": 75650,
+                                 "source": "Binance", "data_ts": 1_794_000_000_000})
+        self.assertLessEqual(len(txt), 700)
+        self.assertIn("操作：", txt)
+        self.assertIn("非投资建议", txt)
+
+
+class TargetTest(unittest.TestCase):
+    def test_settings_target_wins(self):
+        from beagle import push
+        self.assertEqual(push.resolve_target({"qq_target": "12345"}, "x.db"),
+                         "12345")
 
 
 if __name__ == "__main__":

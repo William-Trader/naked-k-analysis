@@ -42,7 +42,7 @@ def load_env_file(path: str) -> None:
 
 
 def resolve_target(cfg: dict, db_path: str):
-    target = os.environ.get("BEAGLE_QQ_TARGET")
+    target = (cfg or {}).get("qq_target") or os.environ.get("BEAGLE_QQ_TARGET")
     if target:
         return target
     path = os.environ.get("BEAGLE_ENV_FILE") or os.path.join(
@@ -156,7 +156,13 @@ def push_outbox(db_path: str, cfg: dict | None = None, dry_run: bool = False,
     target = resolve_target(cfg, db_path)
     out = []
     now_hour = time.localtime().tm_hour
+    now_ms = int(time.time() * 1000)
+    max_age = int((cfg or {}).get("max_alert_age_min", 30) or 0) * 60_000
     for row in store.outbox_pending(db_path, limit):
+        if max_age and row.get("created_at") and now_ms - int(row["created_at"]) > max_age:
+            store.outbox_mark(db_path, row["id"], "stale")
+            out.append({"id": row["id"], "status": "stale_skip"})
+            continue
         if dry_run:
             out.append({"id": row["id"], "status": "dry",
                         "text": row.get("text", "")[:120]})

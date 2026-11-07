@@ -47,6 +47,9 @@ DEFAULTS = {
     "auto_analyze": True,
     "auto_trigger": True,
     "auto_push": False,              # QQ delivery is opt-in
+    "push_armed": False,             # also push newly armed plans
+    "qq_target": "",                 # optional per-settings target
+    "quiet_hours": [23, 8],
     "llm_annotate": True,
     "llm_autotune": False,
     "analysis_ttl_min": 30,
@@ -114,6 +117,13 @@ def _sanitise(s: dict) -> dict:
     s["analysis_ttl_min"] = max(2, min(240, int(s.get("analysis_ttl_min") or 30)))
     s["trigger_seconds"] = max(5, min(300, int(s.get("trigger_seconds") or 20)))
     s["max_open_plans"] = max(1, min(8, int(s.get("max_open_plans") or 2)))
+    s["qq_target"] = str(s.get("qq_target") or "").strip()[:200]
+    qh = s.get("quiet_hours") or [23, 8]
+    if isinstance(qh, list) and len(qh) == 2:
+        s["quiet_hours"] = [int(qh[0]) % 24, int(qh[1]) % 24]
+    else:
+        s["quiet_hours"] = [23, 8]
+    s["push_armed"] = bool(s.get("push_armed"))
     return s
 
 
@@ -222,47 +232,125 @@ def build_plan(symbol: str, payload: dict, params: dict, settings: dict,
         min_rr=float(params.get("plan_min_rr", 1.5)))
 
 
-def _plan_text(plan: dict, event: dict, payload: dict | None = None) -> str:
-    side = planlib.SIDE_CN.get(plan.get("side"), plan.get("side"))
-    typ = event.get("type")
-    head = {
-        "confirmed": "触发确认 · 可执行",
-        "tp1": "目标一达成 · 减仓/移保本",
-        "tp2": "目标二达成 · 了结",
-        "stopped": "止损离场",
-        "invalidated": "结构失效 · 放弃",
-        "expired": "计划超时作废",
-        "triggered": "进入触发区 · 等待确认",
-    }.get(typ, typ)
+def _fp(x, nd=4):
+    if x is None:
+        return "—"
+    v = float(x)
+    if abs(v) >= 1000:
+        return "{:,.2f}".format(v)
+    if abs(v) >= 10:
+        return "%.2f" % v
+    if abs(v) >= 1:
+        return "%.3f" % v
+    return "%.4f" % v
+
+
+def _side_cn(side):
+    return "做多" if side == "long" else ("做空" if side == "short" else "观望")
+
+
+def plan_advice(plan: dict, event: dict | None = None,
+                payload: dict | None = None) -> dict:
+    """Simple, actionable Chinese advice. Deterministic; no invented numbers."""
+    plan = plan or {}
+    event = event or {}
+    payload = payload or {}
+    typ = event.get("type") or {
+        "armed": "armed", "triggered": "triggered", "confirmed": "confirmed",
+        "managing": "tp1", "closed": "tp2", "void": "invalidated",
+    }.get(plan.get("status"), "armed")
+    side = plan.get("side")
+    side_cn = _side_cn(side)
     price = event.get("price")
-    lines = ["%s · %s · %s" % (str(plan.get("symbol", "")).replace("USDT", ""),
-                               plan.get("interval"), side),
-             "状态：%s" % head]
-    if price:
-        lines.append("价格：%.4f" % float(price))
-    lines.append("触发 %.4f / 止损 %.4f / 目标 %.4f%s" % (
-        float(plan.get("trigger") or 0), float(plan.get("stop") or 0),
-        float(plan.get("target1") or 0),
-        (" / %.4f" % float(plan["target2"])) if plan.get("target2") else ""))
-    lines.append("R:R %s · 置信 %s(%s) · %s" % (
-        plan.get("rr"), plan.get("confidence"), plan.get("grade"),
-        planlib.TYPE_CN.get(plan.get("status"), plan.get("status"))))
-    if event.get("reason"):
-        lines.append("原因：%s" % event["reason"])
-    if payload:
-        m = payload.get("mtf") or {}
-        lines.append("周期：%s · 结构 %s" % (
-            m.get("label") or "—",
-            ((payload.get("intervals") or {}).get("4h") or {}).get(
-                "structure", {}).get("state") or "—"))
-        data_ts = payload.get("data_ts")
-        if data_ts:
-            lines.append("数据：%s · %s" % (
-                payload.get("source") or "—",
-                time.strftime("%m-%d %H:%M", time.localtime(data_ts / 1000))))
-    lines.append("失效：%s" % (plan.get("invalidation") or "结构破坏"))
-    lines.append("非投资建议")
-    return "\n".join(lines)
+    if price is None:
+        price = payload.get("price") or plan.get("entry_ref")
+    trig = plan.get("trigger")
+    stop = plan.get("stop")
+    t1 = plan.get("target1")
+    t2 = plan.get("target2")
+    atr = float(plan.get("atr") or 0)
+    raw_sym = payload.get("name") or plan.get("symbol") or ""
+    sym = raw_sym if "/" in raw_sym else (
+        raw_sym.replace("USDT", "/USDT") if raw_sym.endswith("USDT") else raw_sym)
+    headline = "%s · %s · %s" % (sym, plan.get("interval") or "", side_cn)
+    status_cn = {
+        "armed": "计划待触发", "triggered": "已到触发区，复核中",
+        "confirmed": "触发确认", "tp1": "目标一达成",
+        "tp2": "目标二达成", "stopped": "止损离场",
+        "invalidated": "结构失效", "void": "计划作废",
+        "expired": "计划超时",
+    }.get(typ) or {
+        "armed": "计划待触发", "triggered": "已到触发区，复核中",
+        "confirmed": "触发确认", "managing": "持仓管理",
+        "closed": "计划结束", "void": "计划作废",
+    }.get(plan.get("status"), plan.get("status") or typ)
+
+    action = ""
+    if typ in ("armed", "triggered"):
+        action = "等价格到 %s 再执行；未到不追。" % _fp(trig)
+        if typ == "triggered":
+            action = "已到触发区，正在重新分析；确认前不进场。"
+    elif typ == "confirmed":
+        if side == "long":
+            if price is None or float(price) <= float(trig):
+                action = "等回踩到 %s 附近再做多，止损 %s。" % (
+                    _fp(trig), _fp(stop))
+            elif atr and (float(price) - float(trig)) > 0.45 * atr:
+                action = "现价离触发价已远，不追；等回踩 %s 再考虑。" % _fp(trig)
+            else:
+                action = "现价 %s 附近可轻仓做多，止损 %s。" % (
+                    _fp(price), _fp(stop))
+        elif side == "short":
+            if price is None or float(price) >= float(trig):
+                action = "等反抽到 %s 附近再做空，止损 %s。" % (
+                    _fp(trig), _fp(stop))
+            elif atr and (float(trig) - float(price)) > 0.45 * atr:
+                action = "现价离触发价已远，不追；等反抽 %s 再考虑。" % _fp(trig)
+            else:
+                action = "现价 %s 附近可轻仓做空，止损 %s。" % (
+                    _fp(price), _fp(stop))
+    elif typ == "tp1":
+        action = f"目标1 已到：减仓 50%，止损上移到 {_fp(trig)}（保本），剩余看目标2。"
+    elif typ == "tp2":
+        action = "目标2 已到：剩余仓位了结，不恋战。"
+    elif typ == "stopped":
+        action = "止损 %s 已触发：离场，不补仓；等下一次结构。" % _fp(stop)
+    elif typ in ("invalidated", "void"):
+        action = "结构失效：取消计划，不追单。"
+    elif typ == "expired":
+        action = "计划超时：取消，不补单。"
+    else:
+        action = "按计划执行；未触发不进场。"
+
+    rr = plan.get("rr")
+    risk = "单笔风险 0.5%–1%"
+    if rr:
+        risk += " · R:R %s" % rr
+    reasons = ((plan.get("snapshot") or {}).get("reasons") or [])[:2]
+    mtf = (payload.get("mtf") or {}).get("label")
+    basis_parts = [str(x) for x in reasons if x]
+    if mtf:
+        basis_parts.append("MTF %s" % mtf)
+    basis = " · ".join(basis_parts[:3]) or "结构 + 周期确认"
+    data_ts = payload.get("data_ts")
+    data_line = payload.get("source") or "—"
+    if data_ts:
+        data_line += " · " + time.strftime("%m-%d %H:%M", time.localtime(data_ts / 1000))
+    lines = [headline, "状态：" + status_cn, "操作：" + action]
+    if trig is not None and stop is not None:
+        tgt = " / ".join(x for x in (_fp(t1), _fp(t2) if t2 else "") if x)
+        lines.append("触发 %s ｜ 止损 %s ｜ 目标 %s" % (_fp(trig), _fp(stop), tgt or "—"))
+    lines += ["依据：" + basis, "风控：" + risk,
+              "数据：" + data_line + " · 非投资建议"]
+    return {"headline": headline, "status_cn": status_cn, "action": action,
+            "risk": risk, "basis": basis, "lines": lines}
+
+
+def _plan_text(plan: dict, event: dict, payload: dict | None = None) -> str:
+    adv = plan_advice(plan, event, payload)
+    text = "\n".join(adv["lines"])
+    return text if len(text) <= 700 else text[:699] + "…"
+
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +392,7 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
                   "side": cand["side"], "to_status": "armed"}
             eid = store.add_plan_event(db_path, plan, ev,
                                        planlib.event_key(plan, ev))
-            if eid and "armed" in (s.get("push_severity") or []):
+            if eid and (s.get("push_armed") or "armed" in (s.get("push_severity") or [])):
                 store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
         else:
             plan = active
@@ -319,7 +407,15 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
             eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
             if eid:
                 store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
-    payload["plan"] = planlib.describe(plan) if plan else None
+    if plan:
+        described = planlib.describe(plan)
+        ev_type = {"armed": "armed", "triggered": "triggered",
+                   "confirmed": "confirmed", "managing": "tp1"}.get(
+            plan.get("status"), "armed")
+        described["advice"] = plan_advice(plan, {"type": ev_type}, payload)
+        payload["plan"] = described
+    else:
+        payload["plan"] = None
     payload["params"] = params
     payload["params_profile"] = {"version": prof.get("version") or 0,
                                  "source": prof.get("source") or "default"}

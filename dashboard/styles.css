@@ -162,6 +162,8 @@ button{font-family:inherit;color:inherit}
 .lvl.entry b{color:var(--gold)} .lvl.stop b{color:var(--down)} .lvl.tp b{color:var(--up)}
 .plan-foot{display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--muted)}
 .plan-inval{margin-top:7px;font-size:10px;color:var(--amber);line-height:1.5}
+.plan-advice{margin-top:8px;padding:7px 8px;border:1px solid #4a3d23;border-radius:4px;background:rgba(224,185,104,.06);font-size:11px;line-height:1.55;color:var(--text)}
+.plan-advice span{display:block;font-size:9px;letter-spacing:.1em;color:var(--gold);margin-bottom:2px}
 .plan-actions{display:flex;gap:6px;margin-top:9px}
 
 .stepper{display:flex;align-items:center;gap:0;margin-bottom:9px}

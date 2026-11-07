@@ -180,6 +180,10 @@ export async function openSettings() {
         <input type="checkbox" data-setting="auto_trigger" ${settings.auto_trigger ? 'checked' : ''}></div>
       <div class="toggle"><span>QQ 推送（仅状态迁移）</span>
         <input type="checkbox" data-setting="auto_push" ${settings.auto_push ? 'checked' : ''}></div>
+      <div class="toggle"><span>新计划建立时也推送</span>
+        <input type="checkbox" data-setting="push_armed" ${settings.push_armed ? 'checked' : ''}></div>
+      <div class="field"><label>QQ 群 target（可留空，走环境变量）</label>
+        <input id="set-qq-target" placeholder="例如 123456789" value="${esc(settings.qq_target || '')}"></div>
       <div class="row2">
         <div class="field"><label>分析有效期（分钟）</label>
           <input type="number" id="set-ttl" min="2" max="240" value="${settings.analysis_ttl_min || 30}"></div>
@@ -195,6 +199,15 @@ export async function openSettings() {
       <div class="toggle"><span>自动参数迭代（需 ≥20 条计划样本 + 硬边界）</span>
         <input type="checkbox" data-setting="llm_autotune" ${settings.llm_autotune ? 'checked' : ''}></div>
       <div class="muted" style="font-size:10px">${llm.enabled ? '已连接 ' + esc(llm.model || '') : esc(llm.reason || '未配置 NK_LLM_KEY')}</div>
+      <div class="field" style="margin-top:9px"><label>API Key（仅写入本机 600 文件，不回显）</label>
+        <input type="password" id="llm-key-input" autocomplete="off" spellcheck="false"
+          placeholder="${llm.key_configured ? '已配置（' + esc(llm.key_source || '') + '）——输入新值可覆盖' : '粘贴 API Key'}">
+      </div>
+      <div class="plan-actions">
+        <button class="ghost-btn" data-act="save-llm-key">保存 Key</button>
+        <button class="ghost-btn" data-act="clear-llm-key">清除</button>
+      </div>
+      <div class="muted" id="llm-key-state" style="font-size:10px">${llm.key_configured ? '已配置 · 来源 ' + esc(llm.key_source || '') : '未配置'}</div>
     </div>
 
     <div class="section">
@@ -270,6 +283,32 @@ async function onSettingsClick(e) {
     await loadParams(sym);
     return;
   }
+  if (btn.dataset.act === 'save-llm-key') {
+    const input = document.getElementById('llm-key-input');
+    const key = (input.value || '').trim();
+    if (!key) { alert('请先粘贴 API Key'); return; }
+    const r = await post('/api/llm/key', { api_key: key });
+    if (r.ok) {
+      input.value = '';
+      const st = r.status || await get('/api/llm/status');
+      patch({ llm: st });
+      const el = document.getElementById('llm-key-state');
+      if (el) el.textContent = '已配置 · 来源 ' + (st.key_source || 'file');
+    } else {
+      alert('保存失败：' + (r.error || 'unknown'));
+    }
+    return;
+  }
+  if (btn.dataset.act === 'clear-llm-key') {
+    const r = await post('/api/llm/key', { clear: true });
+    if (r.ok) {
+      const st = r.status || await get('/api/llm/status');
+      patch({ llm: st });
+      const el = document.getElementById('llm-key-state');
+      if (el) el.textContent = '未配置';
+    }
+    return;
+  }
   if (btn.dataset.act === 'llm-optimize') {
     const sym = document.getElementById('set-param-symbol').value;
     btn.textContent = '分析中…';
@@ -300,6 +339,8 @@ async function saveSettings() {
     auto_analyze: document.querySelector('[data-setting="auto_analyze"]').checked,
     auto_trigger: document.querySelector('[data-setting="auto_trigger"]').checked,
     auto_push: document.querySelector('[data-setting="auto_push"]').checked,
+    push_armed: document.querySelector('[data-setting="push_armed"]').checked,
+    qq_target: document.getElementById('set-qq-target').value.trim(),
     llm_annotate: document.querySelector('[data-setting="llm_annotate"]').checked,
     llm_autotune: document.querySelector('[data-setting="llm_autotune"]').checked
   };

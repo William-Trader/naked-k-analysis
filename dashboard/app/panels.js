@@ -76,6 +76,7 @@ function planCard(p) {
       <span>风险 ${plan.risk_pct ?? '—'}%</span>
     </div>
     <div class="plan-foot"><span>目标2 ${fmtPrice(plan.target2)}</span><span>失效 ${ttl}</span></div>
+    ${plan.advice && plan.advice.action ? `<div class="plan-advice"><span>操作建议</span>${esc(plan.advice.action)}</div>` : ''}
     ${plan.invalidation ? `<div class="plan-inval">失效条件：${esc(plan.invalidation)}</div>` : ''}
     ${ev.length ? `<div class="v-reasons" style="margin-top:6px">${ev.slice(0, 2).map(esc).join('<br>')}</div>` : ''}
     <div class="plan-actions">
@@ -160,6 +161,7 @@ function llmCard(p, st) {
     ${body}
     <div class="llm-actions">
       <button class="ghost-btn" data-act="llm-annotate" ${status.enabled ? '' : 'disabled'}>生成解读</button>
+      <button class="ghost-btn" data-act="llm-key">配置 API Key</button>
       <button class="ghost-btn" data-act="open-settings">参数库</button>
     </div>
   `);
