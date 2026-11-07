@@ -203,7 +203,8 @@ export async function openSettings() {
       <div class="muted" style="font-size:10px">${llm.enabled ? '已连接 ' + esc(llm.model || '') : esc(llm.reason || '未配置 NK_LLM_KEY')}</div>
       <div class="field" style="margin-top:9px"><label>API Key（仅写入本机 600 文件，不回显）</label>
         <input type="password" id="llm-key-input" autocomplete="off" spellcheck="false"
-          placeholder="${llm.key_configured ? '已配置（' + esc(llm.key_source || '') + '）——输入新值可覆盖' : '粘贴 API Key'}">
+          pattern="[!-~]{8,}" title="只粘贴 key 本身（ASCII，不含空格/中文）"
+          placeholder="${llm.key_configured ? '已配置（' + esc(llm.key_source || '') + '）——输入新值可覆盖' : '粘贴 sk-... 开头的 key'}">
       </div>
       <div class="plan-actions">
         <button class="ghost-btn" data-act="save-llm-key">保存 Key</button>

@@ -66,6 +66,11 @@ TUNE_SYSTEM = (
 )
 
 
+def _key_ok(key: str) -> bool:
+    """Accept only a single ASCII token; reject pasted UI text / Chinese / newlines."""
+    return bool(key) and key.isascii() and not any(c.isspace() for c in key) and len(key) >= 8
+
+
 def _read_config(path=None):
     p = path or os.environ.get("NK_LLM_CONFIG") or CONFIG_PATH
     try:
@@ -102,6 +107,10 @@ def _settings(path=None, key_file=None) -> dict:
     if not key and cfg.get("api_key"):
         key = str(cfg.get("api_key") or "")
         key_source = "config" if key else None
+    key_invalid = bool(key) and not _key_ok(key)
+    if key_invalid:
+        key = ""
+        key_source = "invalid"
     local = base.startswith(("http://127.0.0.1", "http://localhost",
                              "http://[::1]", "http://0.0.0.0"))
     require_key = bool(cfg.get("require_key", not local))
@@ -110,6 +119,8 @@ def _settings(path=None, key_file=None) -> dict:
     reason = None
     if not configured_on:
         reason = "配置中 enabled=false"
+    elif key_invalid:
+        reason = "API Key 格式错误：只允许 ASCII 字符，不要带空格、换行或中文"
     elif require_key and not key:
         reason = "缺少环境变量 %s（或 NK_LLM_KEY）" % (key_env or "NK_LLM_KEY")
     return {
@@ -117,6 +128,8 @@ def _settings(path=None, key_file=None) -> dict:
         "base": base,
         "model": model,
         "key": key,
+        "key_valid": bool(key) and _key_ok(key),
+        "key_invalid": key_invalid,
         "key_source": key_source,
         "key_env": key_env,
         "key_file": key_file or os.environ.get("NK_LLM_KEY_FILE") or KEY_PATH,
@@ -142,7 +155,8 @@ def status() -> dict:
         "config_exists": s["config_exists"],
         "key_env": s["key_env"],
         "key_source": s["key_source"],
-        "key_configured": bool(s["key"]),
+        "key_configured": bool(s["key_valid"]),
+        "key_invalid": s["key_invalid"],
         "key_file": s["key_file"],
         "requires_key": s["requires_key"],
         "local": s["local"],
@@ -154,6 +168,8 @@ def save_key(key: str, path=None) -> dict:
     key = (key or "").strip()
     if not key:
         return {"ok": False, "error": "empty_key"}
+    if not _key_ok(key):
+        return {"ok": False, "error": "API Key 格式错误：只允许 ASCII 字符，不要带空格、换行或中文"}
     p = path or os.environ.get("NK_LLM_KEY_FILE") or KEY_PATH
     try:
         os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
