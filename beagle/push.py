@@ -142,3 +142,49 @@ def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20
             results.append({"id": a["id"], "status": info["status"],
                             "attempts": info["attempts"], "err": err})
     return results
+
+
+def push_outbox(db_path: str, cfg: dict | None = None, dry_run: bool = False,
+                limit: int = 20):
+    """Drain plan-transition messages (outbox) to the configured QQ target.
+
+    Plan text is composed once when the transition is recorded, so delivery
+    retries can never re-derive different numbers. Quiet hours skip (and keep
+    pending) everything except P0, which maps to stop / invalidation.
+    """
+    cfg = cfg or {}
+    target = resolve_target(cfg, db_path)
+    out = []
+    now_hour = time.localtime().tm_hour
+    for row in store.outbox_pending(db_path, limit):
+        if dry_run:
+            out.append({"id": row["id"], "status": "dry",
+                        "text": row.get("text", "")[:120]})
+            continue
+        if not target:
+            out.append({"id": row["id"], "status": "no_target"})
+            continue
+        urgent = any(k in (row.get("text") or "")
+                     for k in ("止损离场", "结构失效", "计划超时"))
+        if _quiet(now_hour, cfg) and not urgent:
+            out.append({"id": row["id"], "status": "quiet_skip"})
+            continue
+        cmd = [cli_path(), "message", "send", "--channel", "qqbot",
+               "--target", target, "--message", row["text"]]
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+        except Exception as e:
+            store.outbox_mark(db_path, row["id"], "failed", str(e)[:200])
+            out.append({"id": row["id"], "status": "failed",
+                        "err": str(e)[:160]})
+            continue
+        if p.returncode == 0:
+            store.outbox_mark(db_path, row["id"], "sent")
+            out.append({"id": row["id"], "status": "sent"})
+        else:
+            err = (p.stderr or p.stdout or "")[:200]
+            attempts = int(row.get("attempts") or 0) + 1
+            status = "failed" if attempts >= int(cfg.get("max_push_attempts", 5)) else "pending"
+            store.outbox_mark(db_path, row["id"], status, err)
+            out.append({"id": row["id"], "status": status, "err": err})
+    return out

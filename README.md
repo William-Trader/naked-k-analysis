@@ -1,11 +1,11 @@
-# naked-k-analysis
+# naked-k-analysis · 价格行为 AI 交易面板
 
-Zero-dependency price-action analysis and multi-frequency monitoring for crypto markets.
+零依赖（Python 标准库 + SQLite + 本地 vendor 图表）的裸K价格行为终端：多市场数据、双周期联合分析、可追踪的交易计划生命周期、图表几何标注、按标的参数库，以及可选的 LLM 解读与受限参数迭代。
 
 [![ci](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![version](https://img.shields.io/badge/version-1.1.0-blue.svg)](CHANGELOG.md)
-[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#engineering)
+[![version](https://img.shields.io/badge/version-2.0.0-blue.svg)](CHANGELOG.md)
+[![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#工程约束)
 [![License: Personal Use & Group Exchange](https://img.shields.io/badge/License-Personal%20Use%20%26%20Group%20Exchange-blue.svg)](LICENSE)
 [![Watermarked](https://img.shields.io/badge/code-watermarked%20(NKA)-orange.svg)](WATERMARK.md)
 
@@ -13,108 +13,126 @@ Zero-dependency price-action analysis and multi-frequency monitoring for crypto 
 > **仅供个人使用与团体交流；禁止商业用途。**
 > **For personal use and group exchange only. Commercial use is prohibited.**
 
----
-
-## 关于本项目 / About
-
-naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸馏成可执行的确定性规则，通过部署在计算机上配合云端大模型api进行分析。内置llm分析框架，可接入QQ/telegram/Discord等软件直接问ai此刻盘面怎么看，以及按照你的要求主动创建定时分析任务，甚至异动推送。输出可审阅、可追溯、可评分的中立分析。它不执行交易、不承诺预测、不声明收益。
-
-设计上坚持三条：
-
-1. **确定性优先** — 能用规则算的（状态、结构、事件、防线、置信度）不交给大模型；模型只做叙述与综合。
-2. **证据可复核** — 每条结论都落到机器可读的 `BAR / STRUCT / REGIME / POLICY / PLAN` 行，数字可回查。
-3. **如实报告** — 回测没有正期望就写没有，不包装、不吹收益。
-
-系统由三层组成：
-
-- **`nakedk`**：确定性分析引擎（特征、趋势评分、状态、信号、评分、历史回放）。
-- **`beagle`**：多频监测服务（1m/5m 事件、SQLite 状态、去重/冷却/限流、推送桥）。
-- **`knowledge`**：价格行为知识模块（市场结构、逐K、Setup、主力、决策树、输出模板、OCR 提纯、Al Brooks 深度框架、评审标准、Al Brooks 术语全集与引擎映射）。
+> 分析工具，不构成投资建议。项目不执行交易、不承诺收益；回测没有正期望时会如实写明。
 
 ---
 
-## 致谢 / Acknowledgments
+## 界面
 
-本项目的价格行为方法论，源自以下作者与体系的公开著作。我们只做蒸馏与工程化，不声称发明这些方法；原著版权归原作者所有。
+左：K 线 / EMA / 成交量 / 结构摆动 / 供需区 / 通道 / 形态 / 交易计划线。
+右：综合研判、计划卡、周期分析、关键价位、AI 解读、计划事件、数据与引擎状态。
 
-- **Al Brooks** — 价格行为交易三部曲（趋势篇 / 区间篇 / 反转篇），Always-In、Setup、市场周期与 12 问框架。本项目的方法主体与术语体系来自 Brooks。
-- **YTC（Lance Beggs）** — 价格行为交易者方法（支撑阻力、时间框架、趋势方向）。
-- **许佳聪** —《裸K线交易法》，Pinbar、关键位强弱、组合形态信号。
-- **胡云生** —《裸K线技术分析与交易》，区间/趋势/突破结构分析、交易数学。
-- **崔海军** —《裸K线操盘技法》系列，量能异动、同步/非同步性、分时相对性。
-- **陈浩** — 筹码分布理论，吸筹/派发与主力行为。
-- **Adam Grimes** —《技术分析的艺术与科学》，市场结构与交易策略。
-- **Wyckoff** — 吸筹/派发、量价周期。
-
-如果本项目帮助到了你，请向上述作者学习原作——本项目只是这些思想的一个可执行、可验证的实现。
+![价格行为终端](docs/screenshots/dashboard.png)
 
 ---
 
-## 功能
+## 核心能力
 
-**行情** — 蜡烛 + EMA20/50 + 支撑阻力 + 摆动点/形态标注：
+### 1. 多市场，按需接入
 
-![仪表盘](docs/screenshots/dashboard.png)
+| 市场 | 数据源 | 标的示例 | 周期 |
+|---|---|---|---|
+| 加密货币 | Binance public data | BTCUSDT / ETHUSDT / SOL / BNB / XRP | 15m / 1h / 4h / 1d |
+| 大宗商品 | Yahoo Finance chart | GC / SI / HG / CL / NG / ZC / ZS | 15m / 1h / 4h / 1d |
+| 海外指数/期货 | Yahoo Finance chart | SPX / NDX / DJI / ES / NQ / YM | 15m / 1h / 4h / 1d |
+| 国内期货 | 新浪财经 JSONP | RB0 / I0 / CU0 / AU0 / SC0 / MA0 / TA0 | 15m / 1h / 4h / 1d |
 
-**知识库** — 20 个知识模块目录 + 内置 Markdown 渲染：
+默认只分析 **BTC / ETH**；其余标的保留接入能力，在「系统设置 → 标的池」中选用后才拉取。最大同时分析标的数可配置（默认 6，上限 24）。
 
-![知识库](docs/screenshots/knowledge.png)
+### 2. 双周期联合分析
 
-**调参** — stance / trend / 信号K 阈值实时调节并持久化：
+- 默认 **4h（环境/偏向）+ 15m（执行/时机）**，可在设置中切换为单周期。
+- 组合规则保守：周期共振才提高置信度；方向冲突直接降为中性并限制置信度；4h 反向可否决快速周期。
+- 每个周期独立输出：方向、置信度、等级、结构状态、ADX/RSI/ATR/Volume Z/位置、形态、关键位。
 
-![调参](docs/screenshots/params.png)
+### 3. 交易计划生命周期（不是单次信号）
 
-- **六层分析链**：单根K线编码 → 结构标注（BOS/CHoCH）→ 位置上下文 → 量价关系 → 多周期共振 → 信号K质量，逐层输出机器可读行。
-- **单根K线编码**：实体占比、收盘位置、上下影线、range/body 相对 ATR、与前一根重叠、bar 类型、0–100 清晰度。
-- **结构标注**：ATR ZigZag 摆动点、HH/HL/LH/LL、BOS/CHoCH、结构状态机（up/down/range/transition）。
-- **多周期对齐**：1d/4h/1h 三档，alignment −3…+3；方向与对齐冲突的形态直接降权。
-- **量价与位置**：近似 VPOC/价值区/HVN、effort-vs-result、量价背离；距摆动位 ATR 距离、区间边缘分区、前日高低。
-- **信号K六维打分**：收盘位置、实体、影线、前一根跟随、位置、量能；低于 40 视为无效信号K。
-- **趋势评分 0–100**：EMA 排列 + ADX 强度 + 区间位置 + 24h 动量；输出 `TREND|...`。
-- **多频监测与提醒**：1m/5m 价格冲击、量能异常、区间突破、状态切换、资金费率；P0/P1/P2 分级。
-- **反馈闭环**：信号落库 → 到期评分（收益、命中、MFE/MAE、盘中先触止损还是目标）→ 分桶复盘 → 自适应权重。
-- **仪表盘**：暗色终端 UI，三选项卡（行情 / 知识库 / 调参）。行情卡用 **TradingView Lightweight Charts** 渲染 K 线（蜡烛 + EMA20/50 + 支撑阻力 + 摆动点 + 形态标注，本地 vendor 零 CDN）；知识库卡内置 Markdown 渲染 + 模块目录，可在线阅读知识体系；调参卡可实时调节 stance/trend/信号K 阈值并持久化。
-- **逐笔与盘口**：最近 1000 笔成交 delta、大单数，top-100 盘口失衡与价差（`TRADES` / `BOOK`）。
-- **相关性门禁**：BTC/ETH 30 日相关 > 0.8 时视为同一风险，自动丢弃较弱一边（代码强制）。
-- **推送防刷**：30 分钟有效期 + 冷却/限流 + 失败重试与死信。
-- **OpenClaw 技能对接**：`skills/price-action-analyst` + 幂等安装脚本。
-- **工程化**：零依赖、204 单测、GitHub Actions、Dockerfile、Makefile、systemd、一键部署。
-- **知识覆盖自检**：`python3 scripts/knowledge_coverage.py` 对 30 个主题 × 20 个模块做关键词审计，CI 强制 100%。
-- **准确度自审**：`python3 scripts/accuracy_audit.py` 按方向/ADX/重叠/量能/位置分桶，输出命中率、Wilson 下界、扣费净收益与分折一致性。
+```
+armed(待触发) -> triggered(到触发区) -> confirmed(确认) -> managing(持仓管理) -> closed(结束)
+      |                 |                     |
+      +-----------------+---------------------+--> void(失效/超时/手动作废)
+```
 
-### 趋势概率与形态共振
+- 计划由确定性引擎建立：方向 + 触发价 + 止损 + 目标1/2 + R:R + 失效条件 + TTL + 分析快照。
+- **到价不等于入场**：价格触及触发价后，引擎自动重跑一次完整分析并执行确认门（4h 结构、MTF、regime、量能、重叠），通过才发「确认」，不通过则作废。
+- 触发前 4h 结构反转 → 计划自动作废，不带着死计划等价格。
+- 每次状态迁移写入 append-only `plan_events`，带幂等键；进程重启不会重复推送。
+- 达到目标1自动移保本；目标2/止损/超时结束；所有结果进入计划台账。
 
-- `PROB`：按 `regime | ADX 档 | 位置档` 统计历史下一根 4h 的涨/跌/平分布；样本 <100 自动合并到 regime 池，仍不足只输出 `status=insufficient`。
-- `PATTERN_MTF`：1d 形态与 4h 触发的一致性判断，对主形态做 ±8%/级的有界加权（最多 ±24%）。
+### 4. 图表价格行为标注
 
-### 回测结论（如实）
+服务端 `nakedk/annotations.py` 输出可绘制几何，前端用 Lightweight Charts + 透明 Canvas 叠加：
 
-- 18 组参数 × 2 标的 × 8 折、含 1h 盘中路径与 12bp 成本：**0 组平均收益为正**。
-- 最好一组 stop 1.5 / target 2.0 / ADX 22：平均 −0.034%，t = −0.66。
-- 因此方向输出保留为**描述性判断**，不作为入场依据；详见 `docs/OPTIMIZE.md`。
+- ATR ZigZag 摆动点与 HH / HL / LH / LL 标签；
+- 支撑/阻力聚类（触碰次数 + 强度）；
+- 趋势通道（枢轴最小二乘拟合 + R² 过滤 + 右延）；
+- 供需区、突破基座；
+- 双底/双顶、头肩、三角形、楔形、旗形、杯柄等形态多边形 + 颈线 + 量度目标；
+- 当前计划的触发 / 止损 / 目标1 / 目标2 / 风险区。
 
-### 准确度自审（2026-11-06，真实行情）
+### 5. 每个标的一套参数
 
-口径：BTC/ETH 近 150 天、900 根 4h、12bp 往返成本、按时间三等分看折间一致性。
+`state/symbol_profiles.json` 是独立的标的参数库，保存每个标的的覆盖值、来源（manual / llm）、版本和历史。分析时合并到全局默认值；改动只影响该标的。
 
-| 指标 | BTC | ETH |
-|---|---|---|
-| 基线命中率 | 38.6% | 42.2% |
-| 基线平均净收益 | −0.105% | −0.078% |
-| 基线正收益折 | 0/3 | 0/3 |
-| 最差桶（overlap ≥0.70） | 31.6% / −0.236% | 25.9% / −0.553% |
-| 加门禁后命中率 | 47.6% | 54.1% |
-| 加门禁后平均净收益 | −0.033% | +0.206% |
-| 加门禁后正收益折 | 2/3 | 2/3 |
+可调项包括 ADX 门槛、区间位置门禁、重叠上限、量能确认、止损/目标 ATR、计划最低置信度、最低 R:R、TTL 等；LLM 建议受硬边界 `symbol_params.BOUNDS` 限制。
 
-本轮改动（全部由实测驱动）：
+### 6. LLM（可选，不参与定价）
 
-1. **高重叠硬否决**：`overlap ≥ 0.70` 直接中性。该桶在两个标的上都是最差桶，属于「无结构可交易」而非「方向看错」。
-2. **量能确认**：趋势延续入场要求 `vol_z ≥ 0`；没有参与度的突破不接。
-3. **置信度重标定**：原固定 56–64 与结果不单调（conf ≥62 的命中率低于基线），改为 35–60 的质量分级，新增 `grade` / `evidence` 字段，不再伪装成概率。
-4. **知识库补全**：新增 15–20 六个模块（头寸规模、多周期、失败突破、时段缺口、证据方法、执行心理），20 模块 × 30 主题覆盖 100%，CI 强制校验。
+配置 `NK_LLM_KEY` 后启用 OpenAI 兼容接口：
 
-诚实结论：门禁移除了已知最差的交易，把 4h 命中率拉到 47.6%/54.1%，但第 3 折仍为负，**仍不宣称正期望**；这是「少亏、可复核」，不是「能稳定赚钱」。复现：`PYTHONPATH=. python3 scripts/accuracy_audit.py`。
+- **图表解读**：输入确定性引擎输出，输出一句话结论、情景、失效条件与风险提示；不生成价位。
+- **受限参数迭代**：仅在计划样本充足（总数 ≥20、已结束 ≥10）时提出 ≤2 个参数的小幅调整；越界、非数字、未知键一律拒绝；每天最多一次。
+- 未配置 key 时返回 `enabled:false`，系统完整可用。
+
+### 7. 推送与实时
+
+- 计划状态迁移写入 `outbox`，由 `beagle/push.py` 通过 OpenClaw qqbot 通道推送；默认关闭，设置中显式开启。
+- 只推 `确认 / 目标达成 / 止损 / 失效`，不推心跳；静默时段保留风险类通知。
+- 前端通过 SSE `/api/stream` 接收 symbol / plan / settings 事件，同时保留 25s 轮询兜底。
+
+### 8. 自动再分析（到价触发）
+
+引擎除了按 TTL 刷新，还会监控当前价格与支撑/阻力、形态颈线、量度目标的距离；进入 `0.35 × ATR` 区间且超过冷却时间时，自动对该标的执行下一次分析。这样「价格到达可能的关键位」会触发新的判断，而不是等固定轮询。
+
+---
+
+## 架构
+
+```
+dashboard/
+  index.html            shell only
+  styles.css            professional dark terminal
+  app/
+    main.js             boot / routing / SSE / polling
+    chart.js            Lightweight Charts + canvas annotation layer
+    panels.js           right-hand modules
+    settings.js         symbol pool / intervals / automation / params
+    api.js  store.js  format.js
+
+nakedk/
+  analysis.py           one symbol -> multi-interval chart-ready payload
+  markets.py            Binance / Yahoo / Sina normalised to one kline shape
+  features.py           EMA / ADX / RSI / ATR / volatility / swings
+  structure.py          ZigZag / HH-HL-LH-LL / BOS / CHoCH
+  patterns.py           pattern candidates + scoring
+  annotations.py        drawable geometry (levels / zones / channels / polygons)
+  multi.py              4h + 15m combination
+  plans.py              plan lifecycle state machine (pure)
+  symbol_params.py      per-instrument parameter library + bounds
+  llm.py                optional commentary + guarded tuning
+  params.py             global defaults
+
+beagle/
+  engine.py             analyse -> arm -> trigger -> confirm -> outbox
+  store.py              SQLite plans / plan_events / outbox / legacy events
+  push.py               QQ outbox delivery
+  monitor.py            legacy 1m/5m event monitor
+```
+
+运行时分两条循环：
+
+- **analysis**：按 TTL / 到价触发，计算特征并刷新计划（重）；
+- **trigger**：每 20s 只比较价格与计划价位（轻），触发后才做一次完整分析确认。
 
 ---
 
@@ -123,179 +141,100 @@ naked-k-analysis 把 Al Brooks 的价格行为（Price Action / 裸K）体系蒸
 ```bash
 git clone https://github.com/William-Trader/naked-k-analysis.git
 cd naked-k-analysis
-bash bootstrap.sh
+
+# 终端（默认 8080）
+python3 dashboard/server.py
+# 或指定端口
+PORT=8099 python3 dashboard/server.py
+
+# 打开
+open http://127.0.0.1:8080/
 ```
 
-手动运行：
+要求 Python 3.10+，无需 pip install。首次启动自动建 `beagle.db` 与 `state/`。
+
+独立运行自动化引擎（与 dashboard 二选一，或共用同一个 SQLite）：
 
 ```bash
+python3 -m beagle.engine
+```
+
+CLI：
+
+```bash
+PYTHONPATH=. python3 -m nakedk fetch BTCUSDT XAU
+PYTHONPATH=. python3 -m nakedk signal XAU
+PYTHONPATH=. python3 -m nakedk knowledge '突破回踩'
 python3 -m unittest discover -s tests
-python3 -m nakedk fetch BTCUSDT ETHUSDT
-python3 -m nakedk signal BTCUSDT ETHUSDT
-PYTHONPATH=. PORT=8080 python3 dashboard/server.py
 ```
 
-### 六层分析链
+### 环境变量
 
-| 层 | 模块 | 输出 |
+| 变量 | 作用 | 默认 |
 |---|---|---|
-| 单根K | `nakedk/bars.py` | `BAR` 行 |
-| 结构 | `nakedk/structure.py` | `STRUCT` 行 |
-| 多周期 | `nakedk/mtf.py` | `MTF` 行 |
-| 位置 | `nakedk/location.py` | `LOC` 行 |
-| 量价 | `nakedk/volume.py` | `VOLP` 行 |
-| 信号K | `nakedk/signalbar.py` | `SIGBAR` 行 |
-
-### 反馈闭环与自迭代
-
-```bash
-python -m beagle backfill --days 120   # 生成带标签的历史信号（source=engine_backfill）
-python -m beagle score                 # 到期评分：收益/命中/MFE/MAE/盘中先触
-python -m beagle review --apply        # 分桶复盘 + 写入自适应权重
-```
-
-实测（481 条回填样本，非实盘业绩）：
-
-```
-样本: 481 | 命中率 49.5% | Wilson [45.0, 53.9] | 期望 -0.009% | MFE 0.72 / MAE -0.66
-multipliers: DB=0.9478 DT=1.0774 IHS=0.9244 L1=0.92 L2=1.0468
-```
-
-> 回填样本用于验证链路与统计方法，不代表任何实盘收益；自适应权重有界、可回滚。
+| `PORT` | dashboard 端口 | `8080` |
+| `BEAGLE_DB` | SQLite 路径 | `<repo>/beagle.db` |
+| `NK_SETTINGS` | 设置文件 | `<repo>/state/settings.json` |
+| `NK_SYMBOL_PROFILES` | 标的参数库 | `<repo>/state/symbol_profiles.json` |
+| `NK_DASH_TOKEN` | 可选 Bearer/查询 token | 空（不鉴权） |
+| `NK_LLM_KEY` | LLM API key | 空（关闭） |
+| `NK_LLM_BASE` | OpenAI 兼容 base URL | `https://api.openai.com/v1` |
+| `NK_LLM_MODEL` | 模型名 | `gpt-4o-mini` |
+| `BEAGLE_QQ_TARGET` | qqbot 推送目标 | 空（不推） |
 
 ---
 
-## 自动分析与提醒
+## API
 
-| 频率 | 任务 | 输出 |
-|---|---|---|
-| 1m | 价格冲击 / 量能异常 | P1/P2 事件 |
-| 5m | 区间/关键位突破 | P1 事件 |
-| 15m | 状态切换 / 主力迹象 | P2 事件 |
-| 4h | 完整简报 | QQ 群 |
-| 事件 | P0 极端行情 | 群 + 私聊 |
-
-提醒策略：P0 立即；P1 5 分钟聚合；P2 只进 4h 简报；23:00–08:00 只推 P0；冷却 60/120/360 分钟；全局限流 6 条/小时、20 条/天。
-
-### QQ 机器人（默认集成）
-
-1. 复制 `config/openclaw.example.json` 到 `~/.openclaw/openclaw.json`，填入 `channels.qqbot.appId`、`channels.qqbot.clientSecret`、`gateway.auth.token`。
-2. 在 `.beagle.env` 填 `BEAGLE_QQ_TARGET=group:<群 openid>`（600 权限，不进仓库）。
-3. 4h 简报：`bash scripts/pa_cron_setup.sh`（先替换群 openid 占位符）。
-4. 5 分钟事件推送：`beagle-push.timer`。
-5. 聊天「分析BTC」：走 `pa_fetch` + `08/09` → `06` 模板。
-
----
-
-## 系统组成
-
-| 路径 | 作用 |
+| Endpoint | 说明 |
 |---|---|
-| `nakedk/features.py` | EMA、ADX、RSI、ATR、量能 z、摆动点、区间位置 |
-| `nakedk/bars.py` | 单根K线编码 |
-| `nakedk/structure.py` | ATR ZigZag、HH/HL/LH/LL、BOS/CHoCH、结构状态 |
-| `nakedk/mtf.py` | 1d/4h/1h 多周期对齐 |
-| `nakedk/signalbar.py` | 信号K六维打分 |
-| `nakedk/volume.py` | VPOC/价值区、effort-vs-result、量价背离 |
-| `nakedk/location.py` | 距摆动位 ATR、区间边缘、前日高低 |
-| `nakedk/stats.py` | Wilson 区间、分桶统计、样本门槛 |
-| `nakedk/calibration.py` | 置信度分桶校准 |
-| `nakedk/trend.py` | 0–100 趋势评分 + Always-In |
-| `nakedk/signals.py` | 确定性方向 + 防线 + 止损/目标 |
-| `nakedk/fetch.py` | Binance 公共数据 + 文本摘要 + TREND 行 |
-| `nakedk/score.py` | 信号结果回算 |
-| `nakedk/backtest.py` | 历史回放（内部研究） |
-| `beagle/detect.py` | 事件检测 |
-| `beagle/monitor.py` | 快照 → 特征 → 事件 → SQLite |
-| `beagle/push.py` | 待推送告警 → QQ |
-| `beagle/review.py` | 分桶复盘 + 自适应权重写回 |
-| `dashboard/` | 零依赖仪表盘 API + 暗色前端 |
-| `knowledge/` | 价格行为知识模块 |
-| `deploy/` | systemd 单元：monitor / push / dashboard |
-| `bootstrap.sh` | 一键部署 |
-| `AGENT-SETUP.md` | 给 Agent 的一键设置说明 |
+| `GET /api/health` | 服务/引擎/LLM/计划统计 |
+| `GET /api/universe` | 全部标的、市场、provider、周期 |
+| `GET /api/overview?symbols=&intervals=` | 多标的概览 |
+| `GET /api/symbol?symbol=&force=` | 单标的完整分析 + 计划 + 事件 |
+| `GET /api/plans` | 开放计划 / 历史 / 事件 / 统计 |
+| `POST /api/analyze` | 立即重算一个标的 |
+| `POST /api/plan/action` | 手动作废计划 |
+| `GET/POST /api/settings` | 标的池 / 周期 / 自动化 / LLM 开关 |
+| `GET/POST /api/symbol-params` | 单标的参数读写、LLM 建议、回滚 |
+| `GET /api/llm/status` | LLM 是否可用 |
+| `POST /api/llm/annotate` | 生成图表解读 |
+| `POST /api/llm/optimize` | 受限参数建议（可显式 apply） |
+| `GET /api/stream` | SSE 实时事件 |
+| `GET /api/knowledge` | 知识库模块/原文 |
 
 ---
 
-## 扩展数据源
+## 准确度与边界（如实）
 
-本工具的数据层与市场无关。价格行为交易者可以修改 `nakedk/fetch.py` 与 `beagle/config.py`，接入其他数据源（其他交易所、股票/期货/外汇 API）。
+本项目此前的实测结论仍然有效：
 
-可行范围取决于：服务器性能（1m 轮询的品种数、K线回补会消耗 CPU/内存）与数据源强度（速率限制、历史深度、字段完整性与稳定性）。
+- BTC/ETH 近 150 天、900 根 4h、12bp 成本：基线命中 38.6% / 42.2%，平均净 −0.105% / −0.078%，3 折全负；
+- 加入高重叠硬否决与量能确认后：47.6% / 54.1%，平均净 −0.033% / +0.206%，正收益折 2/3，第 3 折仍负；
+- **仍不宣称正期望**。计划状态与置信度是描述性质量分级，不是概率承诺。
 
-建议先加一个市场、跑通 `nakedk fetch`，再逐步扩展 watchlist；不要把全市场一次性塞进 1m 轮询。
-
-### 架构
-
-```
-L0 数据      Binance 1m/5m/15m/1h/4h/1d + 资金费率/FGI
-L1 特征      EMA/ADX/RSI/ATR/量能 z/区间/摆动点
-L2 事件      价格冲击/量能异常/区间突破/状态切换/资金费率
-L3 分析      确定性 stance + 趋势评分 + 可选 LLM 叙述
-L4 决策      P0/P1/P2 + entry/stop/target + 置信度
-L5 投递      OpenClaw qqbot / 任意 webhook；去重/冷却/静默/限流
-L6 反馈      SIGNAL → 结果评分 → 校准
-```
-
-完整设计：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
-
-### 工程化
-
-- 零第三方依赖（Python 标准库 + SQLite）
-- 195 个单测；GitHub Actions（3.10/3.12/3.13）
-- Dockerfile、Makefile、systemd 单元
-- `bootstrap.sh` 一键部署
-
-### 许可与免责
-
-- **Personal Use & Group Exchange License**：source-available，**仅供个人使用与团体交流**。
-- **禁止商用**：不得转售、再许可、嵌入付费产品或用于任何商业服务。
-- 本工具不执行交易，不构成投资建议；不声明任何历史业绩。
+因此系统把「不交易」当作合法输出：中性/冲突时不出计划，置信不足时不发确认，结构失效时立即作废。计划台账（`plan_events`）用于后续按 setup / regime / 周期分桶复盘，而不是用单次结果讲故事。
 
 ---
 
-## English
+## 工程约束
 
-### About
+1. **零第三方依赖**：Python 标准库 + SQLite；图表库本地 vendor（Apache 2.0，见 `NOTICE.md`）。
+2. **单一分析路径**：dashboard、CLI、引擎都调用 `nakedk/analysis.py`，不各自推导。
+3. **单一计划事实源**：前端与 QQ 都读同一个 plan / plan_event，避免「群里说 A、页面说 B」。
+4. **幂等**：`plan_events.idempotency_key` + `outbox(plan_event_id, channel)` 唯一约束。
+5. **门禁只做减法**：新增过滤必须有实测依据；不因「看起来更好」而放宽。
+6. **测试只增不减**：237 个单测通过；新增模块带纯函数测试。
 
-naked-k-analysis is a zero-dependency price-action analysis and multi-frequency monitoring toolkit. It does not execute trades, makes no prediction claims, and reports no hypothetical returns. It distils the Al Brooks framework into executable rules and produces structured, reviewable analysis.
+---
 
-Three layers:
+## 致谢
 
-- **`nakedk`** — deterministic analysis engine (features, trend score, stance, signals, scoring, replay).
-- **`beagle`** — multi-frequency monitor (1m/5m events, SQLite state, cooldowns, push bridge).
-- **`knowledge`** — price-action knowledge modules (market structure, bar reading, setups, smart money, decision tree, output template, OCR distillation, deep Al Brooks framework, review rubric, Al Brooks taxonomy).
+价格行为方法论来自 Al Brooks（趋势/区间/反转三部曲、Always-In、Setup）、YTC / Lance Beggs、许佳聪《裸K线交易法》、胡云生《裸K线技术分析与交易》、崔海军《裸K线操盘技法》、陈浩筹码分布、Adam Grimes、Wyckoff。项目只做蒸馏与工程化，原著版权归原作者。
 
-### Acknowledgments
+---
 
-The price-action methodology is distilled from the published works of **Al Brooks** (the trading trilogy), **YTC (Lance Beggs)**, **许佳聪**, **胡云生**, **崔海军**, **陈浩** (chip distribution), **Adam Grimes**, and **Wyckoff**. We only distil and engineer these ideas; we do not claim to have invented them. All original works remain the property of their authors — please study the originals if this project helps you.
+## License
 
-### Features
-
-- **Deterministic first**: EMA/ADX/RSI/ATR/volume z/range position/swings are computed with rules; the LLM only narrates.
-- **Trend score 0–100**: EMA alignment + ADX strength + range position + 24h momentum; emitted as `TREND|...`.
-- **Multi-frequency monitoring**: 1m/5m price shocks, volume spikes, range breaks, state shifts, funding extremes.
-- **Automatic alerts**: P0/P1/P2; cooldowns, quiet hours, rate limits.
-- **Closed loop**: each signal carries a `SIGNAL|...` line; `nakedk score` replays it against real prices.
-- **Engineering**: zero dependencies, 154 unit tests, GitHub Actions, Dockerfile, Makefile, systemd, one-click bootstrap.
-
-### Quickstart
-
-```bash
-git clone https://github.com/William-Trader/naked-k-analysis.git
-cd naked-k-analysis
-bash bootstrap.sh
-```
-
-Manual:
-
-```bash
-python3 -m unittest discover -s tests
-python3 -m nakedk fetch BTCUSDT ETHUSDT
-python3 -m nakedk signal BTCUSDT ETHUSDT
-PYTHONPATH=. PORT=8080 python3 dashboard/server.py
-```
-
-### License
-
-**Personal Use & Group Exchange License** — source-available, for personal use and non-commercial group exchange only. Commercial use, resale, sublicensing, or incorporation into paid products is prohibited. This tool does not execute trades and does not constitute investment advice.
+[Personal Use & Group Exchange License](LICENSE)。仅供个人使用与团体交流；禁止商业用途。
+所有核心源文件带 `WM: NKA-XXXXXXXX` 水印，清单见 [WATERMARK.md](WATERMARK.md)。
