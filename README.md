@@ -4,7 +4,7 @@
 
 [![ci](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![version](https://img.shields.io/badge/version-2.0.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.1.0-blue.svg)](CHANGELOG.md)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#工程约束)
 [![License: Personal Use & Group Exchange](https://img.shields.io/badge/License-Personal%20Use%20%26%20Group%20Exchange-blue.svg)](LICENSE)
 [![Watermarked](https://img.shields.io/badge/code-watermarked%20(NKA)-orange.svg)](WATERMARK.md)

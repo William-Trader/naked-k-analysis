@@ -102,6 +102,20 @@ button{font-family:inherit;color:inherit}
   color:var(--text-dim);background:rgba(8,13,20,.72);border:1px solid var(--line-soft);
   padding:3px 7px;border-radius:3px;pointer-events:none;letter-spacing:.02em;
 }
+.drawbar{
+  position:absolute;left:6px;top:38px;z-index:6;display:flex;flex-direction:column;
+  gap:2px;padding:4px;background:rgba(9,14,21,.9);border:1px solid var(--line);
+  border-radius:5px;box-shadow:0 8px 24px rgba(0,0,0,.35);backdrop-filter:blur(4px);
+}
+.drawbar button{
+  width:25px;height:24px;background:#0b141f;border:1px solid transparent;border-radius:3px;
+  color:#8ea1b8;cursor:pointer;font-size:11px;line-height:1;padding:0;
+}
+.drawbar button:hover{color:var(--text);border-color:#2a3c52}
+.drawbar button.on{color:#10151c;background:var(--gold);border-color:var(--gold)}
+.drawbar .drawsep{height:1px;background:var(--line);margin:2px 1px}
+.drawbar input[type=color]{width:25px;height:20px;padding:0;border:1px solid var(--line);background:#0b141f;border-radius:3px}
+.drawbar select{width:25px;height:20px;background:#0b141f;color:#8ea1b8;border:1px solid var(--line);border-radius:3px;font-size:9px;padding:0}
 .chart-empty[hidden]{display:none}
 .chart-empty{
   position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);

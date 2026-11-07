@@ -42,7 +42,7 @@ DEFAULTS = {
     "active_symbols": ["BTCUSDT", "ETHUSDT"],
     "max_symbols": 6,
     "mode": "multi",                 # multi | single
-    "intervals": ["4h", "15m"],
+    "intervals": ["15m", "4h"],
     "single_interval": "4h",
     "auto_analyze": True,
     "auto_trigger": True,
@@ -168,6 +168,32 @@ def _choose_trigger(side: str, primary: dict, price: float, atr: float,
     return round(trig, 6), planlib.trigger_mode(price, trig)
 
 
+def _confluence(side: str, combined: dict, primary: dict, payload: dict,
+                rr: float | None) -> tuple:
+    score, parts = 40, []
+    if combined.get("agreement") == "aligned":
+        score += 15; parts.append("多周期共振")
+    pstate = (primary.get("structure") or {}).get("state")
+    if (side == "long" and pstate == "up") or (side == "short" and pstate == "down"):
+        score += 15; parts.append("主周期结构同向")
+    other = None
+    for tf, iv in (payload.get("intervals") or {}).items():
+        if tf != (primary.get("interval") or "4h"):
+            other = iv
+            break
+    odir = ((other or {}).get("stance") or {}).get("direction")
+    if odir == side:
+        score += 10; parts.append("次周期同向")
+    elif odir in ("long", "short"):
+        score -= 10; parts.append("次周期反向")
+    pat = primary.get("primary_pattern") or {}
+    if (side == "long" and pat.get("direction") == "bullish") or        (side == "short" and pat.get("direction") == "bearish"):
+        score += 10; parts.append("形态同向")
+    if rr and rr >= 2.0:
+        score += 5; parts.append("R:R≥2")
+    return max(0, min(100, score)), parts
+
+
 def build_plan(symbol: str, payload: dict, params: dict, settings: dict,
                now_ms: int | None = None):
     """Derive an armed plan from a finished analysis payload."""
@@ -222,7 +248,7 @@ def build_plan(symbol: str, payload: dict, params: dict, settings: dict,
     }
     invalidation = ("4h 收盘跌破 %.4f" % stop) if side == "long" else \
                    ("4h 收盘突破 %.4f" % stop)
-    return planlib.build(
+    p = planlib.build(
         symbol, primary.get("interval") or "4h", side,
         price=float(price), atr=float(atr), trigger=trigger, stop=stop,
         target1=target1, target2=target2, setup=setup,
@@ -232,6 +258,18 @@ def build_plan(symbol: str, payload: dict, params: dict, settings: dict,
         params_version=int(payload.get("params_version") or 0),
         invalidation=invalidation, now_ms=now_ms,
         min_rr=float(params.get("plan_min_rr", 1.5)))
+    if not p:
+        return None
+    score, parts = _confluence(side, combined, primary, payload, p.get("rr"))
+    if score < float(params.get("plan_min_confluence", 40)):
+        return None
+    p["confluence"] = score
+    p["confluence_parts"] = parts
+    risk = float(params.get("plan_risk_pct", 0.5))
+    stop_pct = abs(float(trigger) - float(stop)) / float(trigger) * 100 if trigger else 0
+    p["risk_pct"] = risk
+    p["notional_pct"] = round(min(100.0, risk / stop_pct * 100), 1) if stop_pct else None
+    return p
 
 
 def _fp(x, nd=4):
@@ -325,7 +363,9 @@ def plan_advice(plan: dict, event: dict | None = None,
         action = "按计划执行；未触发不进场。"
 
     rr = plan.get("rr")
-    risk = "单笔风险 0.5%–1%"
+    risk = "单笔风险 %s%%" % (plan.get("risk_pct") or 0.5)
+    if plan.get("notional_pct") is not None:
+        risk += " · 名义 %s%%" % plan["notional_pct"]
     if rr:
         risk += " · R:R %s" % rr
     reasons = ((plan.get("snapshot") or {}).get("reasons") or [])[:2]

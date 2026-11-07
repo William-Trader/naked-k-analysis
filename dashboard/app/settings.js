@@ -124,10 +124,10 @@ export async function openSettings() {
     const u = uni.find(x => x.symbol === s) || { symbol: s, name: s, market: 'crypto' };
     return `<span class="chip gold">${esc(u.symbol)} · ${esc(u.name)}</span>`;
   }).join('');
-  const intervalChecks = ['15m', '1h', '4h', '1d'].map(iv =>
+  const intervalChecks = ['15m', '30m', '1h', '4h', '1d'].map(iv =>
     `<label><input type="checkbox" data-setting="intervals" value="${iv}" ${(settings.intervals || []).includes(iv) ? 'checked' : ''}>${iv}</label>`
   ).join('');
-  const singleOpts = ['15m', '1h', '4h', '1d'].map(iv =>
+  const singleOpts = ['15m', '30m', '1h', '4h', '1d'].map(iv =>
     `<option value="${iv}" ${settings.single_interval === iv ? 'selected' : ''}>${iv}</option>`
   ).join('');
   const paramSym = paramsProfile ? paramsProfile.symbol : (settings.active_symbols || [])[0];

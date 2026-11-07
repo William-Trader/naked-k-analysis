@@ -165,7 +165,7 @@ def api_health():
     return {
         "ok": db_ok,
         "service": "naked-k-price-action-terminal",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "as_of": int(time.time() * 1000),
         "db": DB,
         "plans": stats,
@@ -475,6 +475,28 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(api_llm_annotate(body))
             if u.path == "/api/llm/optimize":
                 return self._send(api_llm_optimize(body))
+            if u.path == "/api/drawings":
+                sym = (body.get("symbol") or "").strip().upper()
+                iv = (body.get("interval") or "").strip()
+                lines = body.get("lines") if isinstance(body.get("lines"), list) else []
+                if not sym:
+                    return self._send({"error": "symbol required"})
+                key = sym + "|" + iv if iv else sym
+                path = os.path.join(_REPO_ROOT, "drawings.json")
+                try:
+                    with open(path, encoding="utf-8") as fh:
+                        data = json.load(fh)
+                except Exception:
+                    data = {}
+                data[key] = lines[:2000]
+                try:
+                    tmp = path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as fh:
+                        json.dump(data, fh, ensure_ascii=False)
+                    os.replace(tmp, path)
+                except Exception as e:
+                    return self._send({"error": str(e)[:200]}, status=500)
+                return self._send({"ok": True, "key": key, "lines": lines[:2000]})
             if u.path == "/api/plan/action":
                 return self._send(self._plan_action(body))
             if u.path == "/api/analyze":
@@ -507,9 +529,15 @@ class Handler(BaseHTTPRequestHandler):
         path = os.path.join(_REPO_ROOT, "drawings.json")
         try:
             with open(path, encoding="utf-8") as fh:
-                return json.load(fh)
+                data = json.load(fh)
         except Exception:
-            return {}
+            data = {}
+        sym = (q.get("symbol") or [""])[0].strip().upper()
+        iv = (q.get("interval") or [""])[0].strip()
+        if sym:
+            key = sym + "|" + iv if iv else sym
+            return {"lines": data.get(key) or data.get(sym) or []}
+        return data
 
     def _static(self, path):
         if path == "/styles.css":

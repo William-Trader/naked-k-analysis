@@ -20,11 +20,7 @@
     <div class="sym-rail" id="sym-rail"></div>
     <button class="icon-btn" id="btn-universe" title="标的池">＋</button>
 
-    <div class="tf-rail" id="tf-rail">
-      <button data-tf="15m">15m</button>
-      <button data-tf="4h" class="on">4H</button>
-      <button data-tf="1d">1D</button>
-    </div>
+    <div class="tf-rail" id="tf-rail"></div>
 
     <div class="top-right">
       <div class="live" id="live"><i></i><span>连接中</span></div>
@@ -59,6 +55,32 @@
       <div class="chart-wrap" id="chart-wrap">
         <div id="chart"></div>
         <canvas id="overlay"></canvas>
+        <div class="drawbar" id="drawbar">
+          <button data-draw-tool="cursor" class="on" title="光标 / 缩放">✥</button>
+          <button data-draw-tool="select" title="选择 / 拖动">↖</button>
+          <button data-draw-tool="trend" title="趋势线">╱</button>
+          <button data-draw-tool="ray" title="射线">↗</button>
+          <button data-draw-tool="hline" title="水平线">─</button>
+          <button data-draw-tool="rect" title="矩形">▭</button>
+          <button data-draw-tool="fib" title="斐波那契">ƒ</button>
+          <button data-draw-tool="text" title="文字">T</button>
+          <button data-draw-tool="measure" title="测量">⇔</button>
+          <button data-draw-tool="arrow" title="箭头">→</button>
+          <button data-draw-tool="brush" title="画笔">✎</button>
+          <button data-draw-tool="eraser" title="擦除">⌫</button>
+          <span class="drawsep"></span>
+          <button data-draw-tool="magnet" title="磁吸 OHLC">🧲</button>
+          <button data-draw-tool="lock" title="锁定绘图">🔒</button>
+          <input id="draw-color" type="color" value="#e0b968" title="颜色">
+          <select id="draw-width" title="线宽">
+            <option value="1">1</option><option value="1.6" selected>2</option>
+            <option value="2.4">3</option><option value="3.2">4</option>
+          </select>
+          <span class="drawsep"></span>
+          <button data-draw-tool="undo" title="撤销 Ctrl+Z">↶</button>
+          <button data-draw-tool="redo" title="重做">↷</button>
+          <button data-draw-tool="clear" title="清空">✕</button>
+        </div>
         <div class="ohlc" id="ohlc">—</div>
         <div class="chart-empty" id="chart-empty" hidden>数据加载中…</div>
       </div>

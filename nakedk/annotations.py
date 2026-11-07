@@ -265,6 +265,71 @@ def _pattern_geometry(ks, pat, pivots, atr):
     return geo
 
 
+def _fvg(ks, atr, limit=3):
+    """Fair value gaps / imbalances in the last 80 bars."""
+    out = []
+    n = len(ks)
+    for i in range(max(3, n - 80), n):
+        try:
+            hi2, lo2 = float(ks[i - 2][2]), float(ks[i - 2][3])
+            lo0, hi0 = float(ks[i][3]), float(ks[i][2])
+        except Exception:
+            continue
+        if lo0 > hi2 and (lo0 - hi2) > 0.12 * atr:
+            out.append({"kind": "fvg_bull", "label": "FVG 多",
+                        "top": round(lo0, 6), "bottom": round(hi2, 6),
+                        "from_t": _t(ks, i - 2), "strength": 2})
+        if hi0 < lo2 and (lo2 - hi0) > 0.12 * atr:
+            out.append({"kind": "fvg_bear", "label": "FVG 空",
+                        "top": round(lo2, 6), "bottom": round(hi0, 6),
+                        "from_t": _t(ks, i - 2), "strength": 2})
+    bulls = [z for z in out if z["kind"] == "fvg_bull"][-limit:]
+    bears = [z for z in out if z["kind"] == "fvg_bear"][-limit:]
+    return bulls + bears
+
+
+def _order_blocks(ks, atr, limit=2):
+    """Last opposite candle before a strong impulse, as a supply/demand block."""
+    out = []
+    n = len(ks)
+    for i in range(max(3, n - 60), n - 1):
+        o, c, h, l = (float(ks[i][j]) for j in (1, 4, 2, 3))
+        body = abs(c - o)
+        if body < 1.1 * atr:
+            continue
+        base = ks[i - 1]
+        bo, bc, bh, bl = (float(base[j]) for j in (1, 4, 2, 3))
+        if c > o and bc < bo:
+            out.append({"kind": "order_block_demand", "label": "订单块·需求",
+                        "top": round(max(bo, bc), 6), "bottom": round(bl, 6),
+                        "from_t": _t(ks, i - 1), "strength": 3})
+        elif c < o and bc > bo:
+            out.append({"kind": "order_block_supply", "label": "订单块·供给",
+                        "top": round(bh, 6), "bottom": round(min(bo, bc), 6),
+                        "from_t": _t(ks, i - 1), "strength": 3})
+    return out[-limit:]
+
+
+def _equal_levels(points, atr, kind, limit=2):
+    """Equal highs/lows = liquidity pools, not new structure."""
+    out = []
+    for a, b in zip(points, points[1:]):
+        if abs(a["p"] - b["p"]) <= 0.18 * atr:
+            out.append({"kind": kind, "price": round((a["p"] + b["p"]) / 2, 6),
+                        "touches": 2, "strength": 4, "equal": True,
+                        "last_t": b.get("t")})
+    return out[-limit:]
+
+
+def _dedupe(levels, atr):
+    out = []
+    for x in sorted(levels, key=lambda z: (z.get("strength") or 0), reverse=True):
+        if any(abs(x["price"] - y["price"]) <= 0.12 * atr for y in out):
+            continue
+        out.append(x)
+    return out[:6]
+
+
 def build(ks, f, patterns, struct, primary_interval="4h"):
     """Return the full annotation payload for one interval."""
     if not ks:
@@ -283,8 +348,10 @@ def build(ks, f, patterns, struct, primary_interval="4h"):
     price = f.get("price") or _f(ks[-1][4])
     hi_pts = [p for p in pivots if p["kind"] == "H"]
     lo_pts = [p for p in pivots if p["kind"] == "L"]
-    supports = _cluster(lo_pts, atr, "support", price)
-    resistances = _cluster(hi_pts, atr, "resistance", price)
+    supports = _dedupe(_cluster(lo_pts, atr, "support", price) +
+                       _equal_levels(lo_pts, atr, "support"), atr)
+    resistances = _dedupe(_cluster(hi_pts, atr, "resistance", price) +
+                          _equal_levels(hi_pts, atr, "resistance"), atr)
     for s in supports + resistances:
         s["last_t"] = next((p["t"] for p in reversed(pivots)
                             if abs(p["p"] - s["price"]) <= 0.35 * atr), None)
@@ -329,7 +396,8 @@ def build(ks, f, patterns, struct, primary_interval="4h"):
         "pivots": pivots,
         "zigzag": [{"t": p["t"], "p": p["p"]} for p in pivots],
         "levels": {"supports": supports, "resistances": resistances},
-        "zones": _zones(ks, pivots, atr, struct),
+        "zones": (_zones(ks, pivots, atr, struct) +
+                  _fvg(ks, atr) + _order_blocks(ks, atr)),
         "channels": _channels(ks, pivots, atr),
         "patterns": out_pats,
         "markers": markers,
@@ -338,5 +406,7 @@ def build(ks, f, patterns, struct, primary_interval="4h"):
             "atr": round(atr, 6),
             "pivots": len(pivots),
             "pattern_count": len(out_pats),
+            "zone_count": len(_zones(ks, pivots, atr, struct)) +
+                         len(_fvg(ks, atr)) + len(_order_blocks(ks, atr)),
         },
     }

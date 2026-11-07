@@ -48,6 +48,25 @@ function stepper(status) {
   ).join('')}</div>`;
 }
 
+function multiTfCard(p) {
+  const order = p.interval_order || Object.keys(p.intervals || {});
+  const cur = window.__nkaRightInterval;
+  const rows = order.map(tf => {
+    const iv = (p.intervals || {})[tf] || {};
+    const st = iv.stance || {};
+    const tr = iv.trend || {};
+    const col = st.direction === 'long' ? 'var(--up)' : st.direction === 'short' ? 'var(--down)' : 'var(--muted)';
+    return `<div class="list-row tf-row" data-act="right-interval" data-tf="${tf}" style="cursor:pointer">
+      <span class="mono" style="min-width:34px;color:${tf === cur ? 'var(--gold)' : 'var(--text-dim)'}">${tf.toUpperCase()}</span>
+      <span style="color:${col};min-width:44px">${dirCN(st.direction)}</span>
+      <span class="mono">${st.confidence ?? '—'}</span>
+      <span class="muted">结构 ${esc((iv.structure || {}).state || '—')}</span>
+      <span class="muted mono">${tr.score ?? '—'}</span>
+    </div>`;
+  }).join('');
+  return card('多周期矩阵', `${order.length} 个周期`, rows || '<div class="empty">无周期</div>');
+}
+
 function planCard(p) {
   const plan = p.plan;
   if (!plan) {
@@ -211,6 +230,7 @@ export function renderPanels(el, st) {
   window.__nkaRightInterval = tf;
   el.innerHTML = [
     verdictCard(p),
+    multiTfCard(p),
     planCard(p),
     intervalCard(p),
     levelsCard(p, tf),
