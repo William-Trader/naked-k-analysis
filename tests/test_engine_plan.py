@@ -53,6 +53,22 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class TriggerSideTest(unittest.TestCase):
+    def test_short_never_arms_below_price(self):
+        primary = {"features": {"atr": 2.0, "ema20": 99.0},
+                   "structure": {"levels": {"swing_high": 98.0}}}
+        trig, mode = engine._choose_trigger("short", primary, 100.0, 2.0, 1.5)
+        self.assertGreater(trig, 100.0)
+        self.assertEqual(mode, "above")
+
+    def test_long_never_arms_above_price(self):
+        primary = {"features": {"atr": 2.0, "ema20": 99.0},
+                   "structure": {"levels": {"swing_low": 98.0}}}
+        trig, mode = engine._choose_trigger("long", primary, 100.0, 2.0, 1.5)
+        self.assertLess(trig, 100.0)
+        self.assertEqual(mode, "below")
+
+
 class AdviceTest(unittest.TestCase):
     def plan(self):
         return {

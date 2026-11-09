@@ -568,15 +568,42 @@ def plan_stats(path: str, symbol: str | None = None) -> dict:
         conn.close()
 
 
-def outbox_add(path: str, plan_event_id: int, channel: str, text: str):
+def outbox_add(path: str, plan_event_id: int, channel: str, text: str,
+               dedupe_min: int = 0):
+    """Insert a pending message; optionally suppress identical text recently sent.
+
+    plan_event_id uniqueness prevents replay of the *same* event. Content
+    dedupe is the second guard: plan churn can create a new plan id with the
+    exact same invalidation text every few minutes.
+    """
     conn = connect(path)
     try:
+        if dedupe_min and dedupe_min > 0:
+            since = _now() - int(dedupe_min) * 60_000
+            row = conn.execute(
+                "SELECT id FROM outbox WHERE channel=? AND text=? AND created_at>=? LIMIT 1",
+                (channel, text, since)).fetchone()
+            if row:
+                return None
         cur = conn.execute(
             "INSERT OR IGNORE INTO outbox(plan_event_id,channel,text,status,attempts,"
             "created_at) VALUES(?,?,?,'pending',0,?)",
             (plan_event_id, channel, text, _now()))
         conn.commit()
         return cur.lastrowid if cur.rowcount else None
+    finally:
+        conn.close()
+
+
+def recent_void_plan(path: str, symbol: str, side: str, since_ms: int):
+    """Latest voided plan for the same symbol/side inside a re-arm cooldown."""
+    conn = connect(path)
+    try:
+        row = conn.execute(
+            "SELECT id,setup,updated_at,outcome FROM plans WHERE symbol=? AND side=? "
+            "AND status='void' AND updated_at>=? ORDER BY id DESC LIMIT 1",
+            (symbol, side, since_ms)).fetchone()
+        return dict(row) if row else None
     finally:
         conn.close()
 

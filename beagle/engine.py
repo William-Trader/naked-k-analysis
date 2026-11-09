@@ -50,6 +50,8 @@ DEFAULTS = {
     "push_armed": False,             # also push newly armed plans
     "qq_target": "",                 # optional per-settings target
     "push_ssh": "",                  # send through a remote qqbot gateway
+    "plan_rearm_cooldown_min": 240,  # no same-side re-arm after a void
+    "push_dedupe_min": 240,          # suppress identical push text
     "quiet_hours": [23, 8],
     "llm_annotate": True,
     "llm_autotune": False,
@@ -120,6 +122,8 @@ def _sanitise(s: dict) -> dict:
     s["max_open_plans"] = max(1, min(8, int(s.get("max_open_plans") or 2)))
     s["qq_target"] = str(s.get("qq_target") or "").strip()[:200]
     s["push_ssh"] = str(s.get("push_ssh") or "").strip()[:120]
+    s["plan_rearm_cooldown_min"] = max(0, min(1440, int(s.get("plan_rearm_cooldown_min") or 240)))
+    s["push_dedupe_min"] = max(0, min(1440, int(s.get("push_dedupe_min") or 240)))
     qh = s.get("quiet_hours") or [23, 8]
     if isinstance(qh, list) and len(qh) == 2:
         s["quiet_hours"] = [int(qh[0]) % 24, int(qh[1]) % 24]
@@ -160,10 +164,13 @@ def _choose_trigger(side: str, primary: dict, price: float, atr: float,
     valid = []
     for c in cands:
         dist = (price - c) if is_long else (c - price)
-        if -0.05 * atr <= dist <= max_atr * atr:
+        if 0.05 * atr <= dist <= max_atr * atr:
             valid.append(c)
     if not valid:
-        return round(price, 6), "market"
+        # no pullback level nearby: wait for a small pullback instead of
+        # arming at market and triggering on the very next tick
+        trig = price - 0.15 * atr if is_long else price + 0.15 * atr
+        return round(trig, 6), ("below" if is_long else "above")
     trig = max(valid) if is_long else min(valid)
     return round(trig, 6), planlib.trigger_mode(price, trig)
 
@@ -415,6 +422,10 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
     active = store.active_plan(db_path, symbol)
     cand = build_plan(symbol, payload, params, s)
     now = int(time.time() * 1000)
+    if cand and not active:
+        cooldown = int(s.get("plan_rearm_cooldown_min") or 240) * 60_000
+        if cooldown and store.recent_void_plan(db_path, symbol, cand["side"], now - cooldown):
+            cand = None
     plan = active
     if cand:
         if active and active.get("status") in ("armed",) and \
@@ -435,7 +446,7 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
             eid = store.add_plan_event(db_path, plan, ev,
                                        planlib.event_key(plan, ev))
             if eid and (s.get("push_armed") or "armed" in (s.get("push_severity") or [])):
-                store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+                store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload), dedupe_min=int(s.get("push_dedupe_min") or 0))
         else:
             plan = active
     elif active and active.get("status") == "armed":
@@ -448,7 +459,7 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
             plan = store.save_plan(db_path, plan)
             eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
             if eid:
-                store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+                store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload), dedupe_min=int(s.get("push_dedupe_min") or 0))
     if plan:
         described = planlib.describe(plan)
         ev_type = {"armed": "armed", "triggered": "triggered",
@@ -504,7 +515,7 @@ def refresh_plan(symbol: str, settings: dict | None = None,
         plan = store.save_plan(db_path, plan)
         eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
         if eid and "confirmed" in (s.get("push_severity") or []):
-            store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+            store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload), dedupe_min=int(s.get("push_dedupe_min") or 0))
     else:
         ev = {"type": "invalidated", "price": payload.get("price"), "ts": now,
               "to_status": "void", "outcome": "invalidated",
@@ -513,7 +524,7 @@ def refresh_plan(symbol: str, settings: dict | None = None,
         plan = store.save_plan(db_path, plan)
         eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
         if eid and "invalidated" in (s.get("push_severity") or []):
-            store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload))
+            store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload), dedupe_min=int(s.get("push_dedupe_min") or 0))
     return plan
 
 
@@ -575,7 +586,7 @@ def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
                          "expired": "expired", "invalidated": "invalidated",
                          "void": "invalidated"}.get(ev["type"], ev["type"])
             if eid and push_type in (s.get("push_severity") or []):
-                store.outbox_add(db_path, eid, "qq", _plan_text(updated, ev))
+                store.outbox_add(db_path, eid, "qq", _plan_text(updated, ev), dedupe_min=int(s.get("push_dedupe_min") or 0))
     if events and s.get("auto_push"):
         try:
             push.push_outbox(db_path, s)

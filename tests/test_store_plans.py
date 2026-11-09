@@ -47,6 +47,24 @@ class StoreLifecycleTest(unittest.TestCase):
         store.outbox_mark(self.db, pending[0]["id"], "sent")
         self.assertEqual(store.outbox_pending(self.db), [])
 
+    def test_outbox_content_dedupe(self):
+        first = store.outbox_add(self.db, 1, "qq", "same text", dedupe_min=60)
+        second = store.outbox_add(self.db, 2, "qq", "same text", dedupe_min=60)
+        self.assertIsNotNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(len(store.outbox_pending(self.db)), 1)
+
+    def test_recent_void_plan(self):
+        p = make_plan()
+        p["status"] = "void"
+        p["outcome"] = "invalidated"
+        p = store.save_plan(self.db, p)
+        hit = store.recent_void_plan(self.db, "BTCUSDT", "long",
+                                     p["created_at"] - 1000)
+        self.assertIsNotNone(hit)
+        self.assertEqual(hit["id"], p["id"])
+        self.assertIsNone(store.recent_void_plan(self.db, "ETHUSDT", "long", 0))
+
     def test_tick_moves_armed_to_triggered(self):
         p = store.save_plan(self.db, make_plan())
         settings = {"auto_trigger": True, "auto_push": False,

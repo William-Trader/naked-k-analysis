@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.1.1 — 2026-11-09
+
+QQ 重复推送修复。
+
+### 根因
+- 触发价选到了错误方向（空单触发价低于现价），计划刚建立就触发/失效。
+- 失效后没有再武装冷却，每 2 分钟重新建同方向同价位计划。
+- outbox 只按 `plan_event_id` 去重，不同 plan id 的同一段文字仍会重复推送。
+- 旧 `beagle-monitor` 仍在 qsp 运行，持续写旧事件。
+
+### 修复
+- `_choose_trigger` 只允许同向回踩/反抽；无可用位置时等 0.15 ATR 回踩，不再市价立即触发。
+- 新增 `plan_rearm_cooldown_min`（默认 240 分钟）：同标的同方向 void 后 4 小时内不再建新计划。
+- 新增 `push_dedupe_min`（默认 240 分钟）：outbox 按完整文案去重，即使 plan id 不同也抑制重复。
+- qsp 旧 `beagle-monitor` 已停止并禁用；`beagle-push.timer` 保持 inactive/disabled。
+- 新增回归测试：错误方向触发、内容去重、void 冷却。
+
+### 验证
+- 259 单测通过。
+- qsp 新服务重启后 outbox 维持 105 条历史、无新增重复；最大 id 未增长。
+
 ## 2.1.0 — 2026-11-08
 
 图表交互 + 多周期 + 标注/交易质量升级。
