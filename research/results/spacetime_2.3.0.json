@@ -1,0 +1,808 @@
+{
+  "candidates": [
+    {
+      "gate": null,
+      "name": "baseline",
+      "params": null,
+      "segments": {
+        "test": {
+          "avg_ret": -0.0125,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 46.72,
+          "max_drawdown": -12.33,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.149,
+              "cum_return": -12.28,
+              "fold_stability": 0.0,
+              "folds": 4,
+              "hit_rate": 39.5,
+              "max_drawdown": -12.33,
+              "positive_folds": 0,
+              "sharpe_per_trade": -0.19,
+              "t_stat": -3.669,
+              "trades": 86,
+              "wilson_high": 50.1,
+              "wilson_low": 29.9
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.129,
+              "cum_return": 10.65,
+              "fold_stability": 75.0,
+              "folds": 4,
+              "hit_rate": 54.2,
+              "max_drawdown": -6.12,
+              "positive_folds": 3,
+              "sharpe_per_trade": 0.108,
+              "t_stat": 0.431,
+              "trades": 83,
+              "wilson_high": 64.5,
+              "wilson_low": 43.5
+            }
+          },
+          "positive_folds": 3,
+          "robustness": 0.17856,
+          "sharpe_per_trade": -0.041,
+          "trades": 169,
+          "wilson_high": 54.3,
+          "wilson_low": 39.4
+        },
+        "train": {
+          "avg_ret": -0.2602,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 43.05,
+          "max_drawdown": -48.58,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.162,
+              "cum_return": -25.11,
+              "fold_stability": 0.0,
+              "folds": 4,
+              "hit_rate": 42.0,
+              "max_drawdown": -26.5,
+              "positive_folds": 0,
+              "sharpe_per_trade": -0.119,
+              "t_stat": -3.969,
+              "trades": 169,
+              "wilson_high": 49.5,
+              "wilson_low": 34.8
+            },
+            "ETHUSDT": {
+              "avg_ret": -0.368,
+              "cum_return": -44.97,
+              "fold_stability": 0.0,
+              "folds": 4,
+              "hit_rate": 44.2,
+              "max_drawdown": -48.58,
+              "positive_folds": 0,
+              "sharpe_per_trade": -0.187,
+              "t_stat": -2.053,
+              "trades": 154,
+              "wilson_high": 52.0,
+              "wilson_low": 36.5
+            }
+          },
+          "positive_folds": 0,
+          "robustness": -0.74338,
+          "sharpe_per_trade": -0.153,
+          "trades": 323,
+          "wilson_high": 48.5,
+          "wilson_low": 37.7
+        },
+        "validation": {
+          "avg_ret": -0.1847,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 39.53,
+          "max_drawdown": -29.74,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.363,
+              "cum_return": -24.62,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 36.8,
+              "max_drawdown": -29.74,
+              "positive_folds": 1,
+              "sharpe_per_trade": -0.283,
+              "t_stat": -1.382,
+              "trades": 76,
+              "wilson_high": 48.1,
+              "wilson_low": 26.9
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.049,
+              "cum_return": 1.92,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 43.1,
+              "max_drawdown": -16.19,
+              "positive_folds": 2,
+              "sharpe_per_trade": 0.027,
+              "t_stat": 0.06,
+              "trades": 58,
+              "wilson_high": 55.9,
+              "wilson_low": 31.2
+            }
+          },
+          "positive_folds": 3,
+          "robustness": -0.19424,
+          "sharpe_per_trade": -0.128,
+          "trades": 134,
+          "wilson_high": 48.0,
+          "wilson_low": 31.7
+        }
+      },
+      "spacetime": false
+    },
+    {
+      "gate": "v22",
+      "name": "champion_v22",
+      "params": {
+        "adx_min": 22,
+        "stop_atr": 1.5,
+        "target_atr": 3.0
+      },
+      "segments": {
+        "test": {
+          "avg_ret": 0.1162,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 56.88,
+          "max_drawdown": -5.11,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.071,
+              "cum_return": -2.14,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 48.3,
+              "max_drawdown": -5.11,
+              "positive_folds": 2,
+              "sharpe_per_trade": -0.091,
+              "t_stat": -0.985,
+              "trades": 29,
+              "wilson_high": 65.6,
+              "wilson_low": 31.4
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.363,
+              "cum_return": 8.17,
+              "fold_stability": 75.0,
+              "folds": 4,
+              "hit_rate": 68.2,
+              "max_drawdown": -2.3,
+              "positive_folds": 3,
+              "sharpe_per_trade": 0.349,
+              "t_stat": 4.029,
+              "trades": 22,
+              "wilson_high": 83.6,
+              "wilson_low": 47.3
+            }
+          },
+          "positive_folds": 5,
+          "robustness": 0.55352,
+          "sharpe_per_trade": 0.129,
+          "trades": 51,
+          "wilson_high": 69.5,
+          "wilson_low": 43.3
+        },
+        "train": {
+          "avg_ret": -0.3306,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 45.84,
+          "max_drawdown": -33.55,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.261,
+              "cum_return": -19.64,
+              "fold_stability": 0.0,
+              "folds": 4,
+              "hit_rate": 40.0,
+              "max_drawdown": -21.23,
+              "positive_folds": 0,
+              "sharpe_per_trade": -0.169,
+              "t_stat": -3.754,
+              "trades": 80,
+              "wilson_high": 51.0,
+              "wilson_low": 30.0
+            },
+            "ETHUSDT": {
+              "avg_ret": -0.403,
+              "cum_return": -28.09,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 51.9,
+              "max_drawdown": -33.55,
+              "positive_folds": 1,
+              "sharpe_per_trade": -0.186,
+              "t_stat": -1.512,
+              "trades": 77,
+              "wilson_high": 62.7,
+              "wilson_low": 41.0
+            }
+          },
+          "positive_folds": 1,
+          "robustness": -0.42725,
+          "sharpe_per_trade": -0.177,
+          "trades": 157,
+          "wilson_high": 53.7,
+          "wilson_low": 38.3
+        },
+        "validation": {
+          "avg_ret": -0.3003,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 40.42,
+          "max_drawdown": -14.34,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.486,
+              "cum_return": -13.82,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 36.7,
+              "max_drawdown": -14.34,
+              "positive_folds": 2,
+              "sharpe_per_trade": -0.385,
+              "t_stat": -1.125,
+              "trades": 30,
+              "wilson_high": 54.5,
+              "wilson_low": 21.9
+            },
+            "ETHUSDT": {
+              "avg_ret": -0.047,
+              "cum_return": -1.4,
+              "fold_stability": 75.0,
+              "folds": 4,
+              "hit_rate": 45.5,
+              "max_drawdown": -9.14,
+              "positive_folds": 3,
+              "sharpe_per_trade": -0.026,
+              "t_stat": -0.675,
+              "trades": 22,
+              "wilson_high": 65.3,
+              "wilson_low": 26.9
+            }
+          },
+          "positive_folds": 5,
+          "robustness": -0.05593,
+          "sharpe_per_trade": -0.206,
+          "trades": 52,
+          "wilson_high": 53.9,
+          "wilson_low": 28.2
+        }
+      },
+      "spacetime": false
+    },
+    {
+      "gate": null,
+      "name": "spacetime",
+      "params": null,
+      "segments": {
+        "test": {
+          "avg_ret": -0.1565,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 39.13,
+          "max_drawdown": -7.8,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.461,
+              "cum_return": -7.6,
+              "fold_stability": 0.0,
+              "folds": 4,
+              "hit_rate": 23.5,
+              "max_drawdown": -7.8,
+              "positive_folds": 0,
+              "sharpe_per_trade": -0.624,
+              "t_stat": -3.217,
+              "trades": 17,
+              "wilson_high": 47.3,
+              "wilson_low": 9.6
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.022,
+              "cum_return": 0.36,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 48.3,
+              "max_drawdown": -7.11,
+              "positive_folds": 2,
+              "sharpe_per_trade": 0.016,
+              "t_stat": -0.322,
+              "trades": 29,
+              "wilson_high": 65.6,
+              "wilson_low": 31.4
+            }
+          },
+          "positive_folds": 2,
+          "robustness": -0.13426,
+          "sharpe_per_trade": -0.304,
+          "trades": 46,
+          "wilson_high": 53.5,
+          "wilson_low": 26.4
+        },
+        "train": {
+          "avg_ret": -0.225,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 43.68,
+          "max_drawdown": -21.85,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.415,
+              "cum_return": -18.76,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 40.8,
+              "max_drawdown": -21.85,
+              "positive_folds": 1,
+              "sharpe_per_trade": -0.335,
+              "t_stat": -1.474,
+              "trades": 49,
+              "wilson_high": 54.8,
+              "wilson_low": 28.2
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.02,
+              "cum_return": -0.0,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 47.4,
+              "max_drawdown": -12.93,
+              "positive_folds": 2,
+              "sharpe_per_trade": 0.01,
+              "t_stat": 0.058,
+              "trades": 38,
+              "wilson_high": 62.7,
+              "wilson_low": 32.5
+            }
+          },
+          "positive_folds": 3,
+          "robustness": -0.12388,
+          "sharpe_per_trade": -0.163,
+          "trades": 87,
+          "wilson_high": 54.1,
+          "wilson_low": 33.7
+        },
+        "validation": {
+          "avg_ret": 0.183,
+          "eligible": false,
+          "folds": 8,
+          "hit_rate": 50.0,
+          "max_drawdown": -4.18,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": 0.213,
+              "cum_return": 2.91,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 50.0,
+              "max_drawdown": -2.11,
+              "positive_folds": 2,
+              "sharpe_per_trade": 0.168,
+              "t_stat": 1.045,
+              "trades": 14,
+              "wilson_high": 73.2,
+              "wilson_low": 26.8
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.148,
+              "cum_return": 1.61,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 50.0,
+              "max_drawdown": -4.18,
+              "positive_folds": 1,
+              "sharpe_per_trade": 0.087,
+              "t_stat": -0.919,
+              "trades": 12,
+              "wilson_high": 74.6,
+              "wilson_low": 25.4
+            }
+          },
+          "positive_folds": 3,
+          "robustness": 0.44135,
+          "sharpe_per_trade": 0.128,
+          "trades": 26,
+          "wilson_high": 67.9,
+          "wilson_low": 32.1
+        }
+      },
+      "spacetime": true
+    },
+    {
+      "gate": null,
+      "name": "spacetime+params",
+      "params": {
+        "adx_min": 22,
+        "stop_atr": 1.5,
+        "target_atr": 3.0
+      },
+      "segments": {
+        "test": {
+          "avg_ret": -0.1485,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 38.45,
+          "max_drawdown": -5.65,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.369,
+              "cum_return": -5.07,
+              "fold_stability": 0.0,
+              "folds": 4,
+              "hit_rate": 21.4,
+              "max_drawdown": -5.27,
+              "positive_folds": 0,
+              "sharpe_per_trade": -0.597,
+              "t_stat": -30.419,
+              "trades": 14,
+              "wilson_high": 47.6,
+              "wilson_low": 7.6
+            },
+            "ETHUSDT": {
+              "avg_ret": -0.025,
+              "cum_return": -0.81,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 48.0,
+              "max_drawdown": -5.65,
+              "positive_folds": 2,
+              "sharpe_per_trade": -0.021,
+              "t_stat": -0.193,
+              "trades": 25,
+              "wilson_high": 66.5,
+              "wilson_low": 30.0
+            }
+          },
+          "positive_folds": 2,
+          "robustness": -0.12264,
+          "sharpe_per_trade": -0.309,
+          "trades": 39,
+          "wilson_high": 54.1,
+          "wilson_low": 24.9
+        },
+        "train": {
+          "avg_ret": -0.2471,
+          "eligible": true,
+          "folds": 8,
+          "hit_rate": 41.69,
+          "max_drawdown": -17.69,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.388,
+              "cum_return": -14.63,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 40.0,
+              "max_drawdown": -17.69,
+              "positive_folds": 1,
+              "sharpe_per_trade": -0.335,
+              "t_stat": -1.479,
+              "trades": 40,
+              "wilson_high": 55.4,
+              "wilson_low": 26.3
+            },
+            "ETHUSDT": {
+              "avg_ret": -0.071,
+              "cum_return": -2.95,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 43.8,
+              "max_drawdown": -14.87,
+              "positive_folds": 2,
+              "sharpe_per_trade": -0.033,
+              "t_stat": -0.424,
+              "trades": 32,
+              "wilson_high": 60.7,
+              "wilson_low": 28.2
+            }
+          },
+          "positive_folds": 3,
+          "robustness": -0.12885,
+          "sharpe_per_trade": -0.184,
+          "trades": 72,
+          "wilson_high": 53.2,
+          "wilson_low": 31.0
+        },
+        "validation": {
+          "avg_ret": 0.2088,
+          "eligible": false,
+          "folds": 8,
+          "hit_rate": 51.98,
+          "max_drawdown": -4.18,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": 0.265,
+              "cum_return": 3.39,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 53.8,
+              "max_drawdown": -1.66,
+              "positive_folds": 2,
+              "sharpe_per_trade": 0.204,
+              "t_stat": 1.063,
+              "trades": 13,
+              "wilson_high": 76.8,
+              "wilson_low": 29.1
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.148,
+              "cum_return": 1.61,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 50.0,
+              "max_drawdown": -4.18,
+              "positive_folds": 1,
+              "sharpe_per_trade": 0.087,
+              "t_stat": -0.919,
+              "trades": 12,
+              "wilson_high": 74.6,
+              "wilson_low": 25.4
+            }
+          },
+          "positive_folds": 3,
+          "robustness": 0.44934,
+          "sharpe_per_trade": 0.145,
+          "trades": 25,
+          "wilson_high": 70.0,
+          "wilson_low": 33.5
+        }
+      },
+      "spacetime": true
+    },
+    {
+      "gate": "v22",
+      "name": "spacetime+v22",
+      "params": {
+        "adx_min": 22,
+        "stop_atr": 1.5,
+        "target_atr": 3.0
+      },
+      "segments": {
+        "test": {
+          "avg_ret": 0.0582,
+          "eligible": false,
+          "folds": 8,
+          "hit_rate": 55.56,
+          "max_drawdown": -3.03,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": 0.116,
+              "cum_return": 0.46,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 50.0,
+              "max_drawdown": -0.44,
+              "positive_folds": 1,
+              "sharpe_per_trade": 0.323,
+              "t_stat": 0.849,
+              "trades": 4,
+              "wilson_high": 85.0,
+              "wilson_low": 15.0
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.012,
+              "cum_return": 0.01,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 60.0,
+              "max_drawdown": -3.03,
+              "positive_folds": 1,
+              "sharpe_per_trade": 0.008,
+              "t_stat": -0.215,
+              "trades": 5,
+              "wilson_high": 88.2,
+              "wilson_low": 23.1
+            }
+          },
+          "positive_folds": 2,
+          "robustness": 0.02345,
+          "sharpe_per_trade": 0.166,
+          "trades": 9,
+          "wilson_high": 81.1,
+          "wilson_low": 26.7
+        },
+        "train": {
+          "avg_ret": -0.1705,
+          "eligible": false,
+          "folds": 8,
+          "hit_rate": 57.15,
+          "max_drawdown": -7.99,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": -0.198,
+              "cum_return": -2.84,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 50.0,
+              "max_drawdown": -5.53,
+              "positive_folds": 1,
+              "sharpe_per_trade": -0.168,
+              "t_stat": -0.893,
+              "trades": 14,
+              "wilson_high": 73.2,
+              "wilson_low": 26.8
+            },
+            "ETHUSDT": {
+              "avg_ret": -0.143,
+              "cum_return": -2.33,
+              "fold_stability": 50.0,
+              "folds": 4,
+              "hit_rate": 64.3,
+              "max_drawdown": -7.99,
+              "positive_folds": 2,
+              "sharpe_per_trade": -0.065,
+              "t_stat": -0.48,
+              "trades": 14,
+              "wilson_high": 83.7,
+              "wilson_low": 38.8
+            }
+          },
+          "positive_folds": 3,
+          "robustness": -0.04231,
+          "sharpe_per_trade": -0.117,
+          "trades": 28,
+          "wilson_high": 73.5,
+          "wilson_low": 39.1
+        },
+        "validation": {
+          "avg_ret": 0.633,
+          "eligible": false,
+          "folds": 8,
+          "hit_rate": 100.0,
+          "max_drawdown": 0,
+          "per_symbol": {
+            "BTCUSDT": {
+              "avg_ret": 0.873,
+              "cum_return": 1.75,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 100.0,
+              "max_drawdown": 0.0,
+              "positive_folds": 1,
+              "sharpe_per_trade": null,
+              "t_stat": 0.0,
+              "trades": 2,
+              "wilson_high": 100.0,
+              "wilson_low": 34.2
+            },
+            "ETHUSDT": {
+              "avg_ret": 0.153,
+              "cum_return": 0.15,
+              "fold_stability": 25.0,
+              "folds": 4,
+              "hit_rate": 100.0,
+              "max_drawdown": 0.0,
+              "positive_folds": 1,
+              "sharpe_per_trade": null,
+              "t_stat": 0.0,
+              "trades": 1,
+              "wilson_high": 100.0,
+              "wilson_low": 20.7
+            }
+          },
+          "positive_folds": 2,
+          "robustness": 0.03041,
+          "sharpe_per_trade": 0.0,
+          "trades": 3,
+          "wilson_high": 100.0,
+          "wilson_low": 43.8
+        }
+      },
+      "spacetime": true
+    }
+  ],
+  "data": {
+    "base": "https://data-api.binance.vision",
+    "days": 730,
+    "rows": {
+      "BTCUSDT_1h.json.gz": 17519,
+      "BTCUSDT_4h.json.gz": 4379,
+      "ETHUSDT_1h.json.gz": 17519,
+      "ETHUSDT_4h.json.gz": 4379
+    },
+    "sha256": "e8ea5905476ef45d"
+  },
+  "disclaimer": "Historical simulation. Not a claim of positive expectation or of being 'industry best'; all numbers are reproducible from the frozen snapshot.",
+  "generated_at": 1794469273066,
+  "method": "frozen snapshot; train 50% / validation 25% / test 25% evaluated once; 4-fold walk-forward per segment; 12bp round-trip cost; adaptive spacetime mask has no look-ahead",
+  "verdict": {
+    "best_spacetime": "spacetime+params",
+    "best_spacetime_test": {
+      "avg_ret": -0.1485,
+      "eligible": true,
+      "folds": 8,
+      "hit_rate": 38.45,
+      "max_drawdown": -5.65,
+      "per_symbol": {
+        "BTCUSDT": {
+          "avg_ret": -0.369,
+          "cum_return": -5.07,
+          "fold_stability": 0.0,
+          "folds": 4,
+          "hit_rate": 21.4,
+          "max_drawdown": -5.27,
+          "positive_folds": 0,
+          "sharpe_per_trade": -0.597,
+          "t_stat": -30.419,
+          "trades": 14,
+          "wilson_high": 47.6,
+          "wilson_low": 7.6
+        },
+        "ETHUSDT": {
+          "avg_ret": -0.025,
+          "cum_return": -0.81,
+          "fold_stability": 50.0,
+          "folds": 4,
+          "hit_rate": 48.0,
+          "max_drawdown": -5.65,
+          "positive_folds": 2,
+          "sharpe_per_trade": -0.021,
+          "t_stat": -0.193,
+          "trades": 25,
+          "wilson_high": 66.5,
+          "wilson_low": 30.0
+        }
+      },
+      "positive_folds": 2,
+      "robustness": -0.12264,
+      "sharpe_per_trade": -0.309,
+      "trades": 39,
+      "wilson_high": 54.1,
+      "wilson_low": 24.9
+    },
+    "champion_test": {
+      "avg_ret": 0.1162,
+      "eligible": true,
+      "folds": 8,
+      "hit_rate": 56.88,
+      "max_drawdown": -5.11,
+      "per_symbol": {
+        "BTCUSDT": {
+          "avg_ret": -0.071,
+          "cum_return": -2.14,
+          "fold_stability": 50.0,
+          "folds": 4,
+          "hit_rate": 48.3,
+          "max_drawdown": -5.11,
+          "positive_folds": 2,
+          "sharpe_per_trade": -0.091,
+          "t_stat": -0.985,
+          "trades": 29,
+          "wilson_high": 65.6,
+          "wilson_low": 31.4
+        },
+        "ETHUSDT": {
+          "avg_ret": 0.363,
+          "cum_return": 8.17,
+          "fold_stability": 75.0,
+          "folds": 4,
+          "hit_rate": 68.2,
+          "max_drawdown": -2.3,
+          "positive_folds": 3,
+          "sharpe_per_trade": 0.349,
+          "t_stat": 4.029,
+          "trades": 22,
+          "wilson_high": 83.6,
+          "wilson_low": 47.3
+        }
+      },
+      "positive_folds": 5,
+      "robustness": 0.55352,
+      "sharpe_per_trade": 0.129,
+      "trades": 51,
+      "wilson_high": 69.5,
+      "wilson_low": 43.3
+    },
+    "decision": "keep v22 champion; spacetime did not improve out-of-sample and stays an optional engine",
+    "role": "descriptive analytics layer (NK_SPACETIME=1), NOT a trade gate",
+    "spacetime_beats_champion_out_of_sample": false,
+    "test_reuse_warning": "v2 rules were revised after inspecting v1 test results, so the test segment has been consulted twice. The 2.2.0 v22 champion is the only configuration whose test was evaluated exactly once. For that reason spacetime is NOT promoted to a decision gate regardless of these numbers; further rule tuning against this same test set would be overfitting."
+  }
+}
