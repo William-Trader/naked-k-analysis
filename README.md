@@ -1,34 +1,47 @@
-# naked-k-analysis · 价格行为 AI 交易面板
+# naked-k-analysis · 价格行为分析终端
 
-零依赖（Python 标准库 + SQLite + 本地 vendor 图表）的裸K价格行为终端：多市场数据、双周期联合分析、可追踪的交易计划生命周期、图表几何标注、按标的参数库，以及可选的 LLM 解读与受限参数迭代。
+**把裸K价格行为从"看图说话"变成可追踪、可回测、可解释的工程系统。**
+
+零第三方 Python 依赖（标准库 + SQLite + 本地 vendor 图表）的多市场终端：确定性分析引擎、双周期联合研判、几何标注、完整的交易计划生命周期、自适应时空状态，以及把**每一次状态切换**送达唯一 QQ 群的推送链路。
 
 [![ci](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![version](https://img.shields.io/badge/version-2.3.0-blue.svg)](CHANGELOG.md)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#工程约束)
-[![License: Personal Use & Group Exchange](https://img.shields.io/badge/License-Personal%20Use%20%26%20Group%20Exchange-blue.svg)](LICENSE)
-[![Watermarks (partial)](https://img.shields.io/badge/code-watermarks-partial%20(NKA)-orange.svg)](WATERMARK.md)
+[![tests](https://img.shields.io/badge/tests-307%20passing-brightgreen.svg)](#工程约束)
+[![License](https://img.shields.io/badge/License-Personal%20Use%20%26%20Group%20Exchange-blue.svg)](LICENSE)
 
-> **许可 / License**: [Personal Use & Group Exchange License](LICENSE).
-> **仅供个人使用与团体交流；禁止商业用途。**
-> **For personal use and group exchange only. Commercial use is prohibited.**
-
-> 分析工具，不构成投资建议。项目不执行交易、不承诺收益；回测没有正期望时会如实写明。
+> 分析工具，不构成投资建议。项目不执行交易、不承诺收益；**回测没有正期望时会如实写出来**。
 
 ---
 
-## 界面
+## 先看界面
 
-左：K 线 / EMA / 成交量 / 结构摆动 / 供需区 / 通道 / 形态 / 交易计划线。
-右：综合研判、计划卡、周期分析、关键价位、AI 解读、计划事件、数据与引擎状态。
+> 下图是 **2.3.0 生产实例的真实截图**（BTC/USDT，15m 图 + 4h 分析，非示意图）。
 
-![价格行为终端](docs/screenshots/dashboard.png)
+![价格行为终端 · 真实运行截图](docs/screenshots/dashboard-2.3.0.png)
+
+左侧是 K 线、EMA20/50、成交量、ATR ZigZag 摆动、支撑阻力聚类、趋势通道、供需区、形态多边形与计划价位线；右侧是综合研判、多周期矩阵、交易计划、周期分析、关键价位、AI 解读、计划事件与数据引擎状态。
+
+---
+
+## 为什么它不一样
+
+| | 常见做法 | 本项目 |
+|---|---|---|
+| **信号** | 一次性的"买入/卖出"提示 | **有生命周期的计划**：`armed → triggered → confirmed → managing → closed`，每一步落库、可回放 |
+| **到价** | 触价即视为入场 | 触价后**重跑一次完整分析**并过确认门；未通过直接作废，不裸触发 |
+| **结论** | 靠 LLM 生成 | 确定性引擎定价，**LLM 只写解读**；价位永远来自规则 |
+| **改进** | 调参直到回测好看 | 冻结快照 + 三段式 walk-forward + **样本外只评估一次** + 扰动压力验证 |
+| **解释** | 黑箱分数 | 每个拒绝理由、每次状态切换、每个时空分量都能用中文说清依据 |
+
+**「不交易」是一等公民输出**：中性/冲突时不出计划，置信不足不发确认，结构失效立即作废。计划状态与置信度是描述性质量分级，不是概率承诺。
 
 ---
 
 ## 核心能力
 
-### 1. 多市场，按需接入
+### 多市场，按需接入
 
 | 市场 | 数据源 | 标的示例 | 周期 |
 |---|---|---|---|
@@ -37,15 +50,13 @@
 | 海外指数/期货 | Yahoo Finance chart | SPX / NDX / DJI / ES / NQ / YM | 15m / 1h / 4h / 1d |
 | 国内期货 | 新浪财经 JSONP | RB0 / I0 / CU0 / AU0 / SC0 / MA0 / TA0 | 15m / 1h / 4h / 1d |
 
-默认只分析 **BTC / ETH**；其余标的保留接入能力，在「系统设置 → 标的池」中选用后才拉取。最大同时分析标的数可配置（默认 6，上限 24）。
+默认只分析 **BTC / ETH**；其余标的在「系统设置 → 标的池」启用后才拉取。最大同时分析标的数可配（默认 6，上限 24）。
 
-### 2. 双周期联合分析
+### 双周期联合分析
 
-- 默认 **4h（环境/偏向）+ 15m（执行/时机）**，可在设置中切换为单周期。
-- 组合规则保守：周期共振才提高置信度；方向冲突直接降为中性并限制置信度；4h 反向可否决快速周期。
-- 每个周期独立输出：方向、置信度、等级、结构状态、ADX/RSI/ATR/Volume Z/位置、形态、关键位。
+默认 **4h（环境/偏向）+ 15m（执行/时机）**，可切换单周期。周期共振才提高置信度；方向冲突降为中性并限制置信度；高周期反向可否决快速周期。每个周期独立输出方向、置信度、结构状态、ADX/RSI/ATR/Volume Z/位置、形态与关键位。
 
-### 3. 交易计划生命周期（不是单次信号）
+### 交易计划生命周期
 
 ```
 armed(待触发) -> triggered(到触发区) -> confirmed(确认) -> managing(持仓管理) -> closed(结束)
@@ -53,141 +64,159 @@ armed(待触发) -> triggered(到触发区) -> confirmed(确认) -> managing(持
       +-----------------+---------------------+--> void(失效/超时/手动作废)
 ```
 
-- 计划由确定性引擎建立：方向 + 触发价 + 止损 + 目标1/2 + R:R + 失效条件 + TTL + 分析快照。
-- **到价不等于入场**：价格触及触发价后，引擎自动重跑一次完整分析并执行确认门（4h 结构、MTF、regime、量能、重叠），通过才发「确认」，不通过则作废。
-- 触发前 4h 结构反转 → 计划自动作废，不带着死计划等价格。
-- 每次状态迁移写入 append-only `plan_events`，带幂等键；进程重启不会重复推送。
-- 达到目标1自动移保本；目标2/止损/超时结束；所有结果进入计划台账。
+计划包含方向、触发价、止损、目标 1/2、R:R、失效条件、TTL 与分析快照。目标 1 达成自动移保本；每次状态迁移写入 append-only `plan_events` 并带幂等键，进程重启不会重复推送。
 
-### 4. 图表价格行为标注
+### 图表几何标注
 
-服务端 `nakedk/annotations.py` 输出可绘制几何，前端用 Lightweight Charts + 透明 Canvas 叠加：
+服务端 `nakedk/annotations.py` 输出可绘制几何，前端用 Lightweight Charts + 透明 Canvas 叠加：ATR ZigZag 与 HH/HL/LH/LL、支撑阻力聚类、最小二乘趋势通道（R² 过滤 + 右延）、供需区与突破基座、双底双顶/头肩/三角形/楔形/旗形/杯柄多边形 + 颈线 + 量度目标、FVG 与订单块、当前计划的触发/止损/目标/风险区。另有 12 种绘图工具（趋势线、斐波那契、测量、文字、磁吸、撤销重做）按标的+周期持久化。
 
-- ATR ZigZag 摆动点与 HH / HL / LH / LL 标签；
-- 支撑/阻力聚类（触碰次数 + 强度）；
-- 趋势通道（枢轴最小二乘拟合 + R² 过滤 + 右延）；
-- 供需区、突破基座；
-- 双底/双顶、头肩、三角形、楔形、旗形、杯柄等形态多边形 + 颈线 + 量度目标；
-- 当前计划的触发 / 止损 / 目标1 / 目标2 / 风险区。
+### 每个标的一套参数
 
-### 5. 每个标的一套参数
+`state/symbol_profiles.json` 保存每个标的的覆盖值、来源、版本与历史，改动只影响该标的。所有数值键都受 `symbol_params.BOUNDS` 硬边界约束；LLM 建议越界、非数字、未知键一律拒绝。
 
-`state/symbol_profiles.json` 是独立的标的参数库，保存每个标的的覆盖值、来源（manual / llm）、版本和历史。分析时合并到全局默认值；改动只影响该标的。
+### LLM（可选，不参与定价）
 
-可调项包括 ADX 门槛、区间位置门禁、重叠上限、量能确认、止损/目标 ATR、计划最低置信度、最低 R:R、TTL 等；LLM 建议受硬边界 `symbol_params.BOUNDS` 限制。
+支持任意 OpenAI 兼容接口（DeepSeek / OpenAI / 通义千问 / Moonshot / Ollama / vLLM）。面板 `⚙ → LLM → API Key` 可直接输入（存本机 `state/llm.key`，0600，不回显），或用 `NK_LLM_*` 环境变量覆盖。图表解读只输出一句话结论、情景、失效条件与风险提示；受限参数迭代仅在样本充足（总数 ≥20、已结束 ≥10）时提出 ≤2 项小幅调整，每天最多一次。未配置 key 时系统完整可用。详见 [docs/LLM.md](docs/LLM.md)。
 
-### 6. LLM（可选，不参与定价）
+### 全状态推送到唯一 QQ 群
 
-支持任意 OpenAI 兼容接口（DeepSeek / OpenAI / 通义千问 / Moonshot / Ollama / vLLM）。
+**每一次可见状态变化都会推送**，且强制投递到**唯一**配置的群：
 
-- **配置方式**：面板右上角 `⚙ → LLM → API Key` 可直接输入（保存到本机 `state/llm.key`，0600，不回显）；也可复制 `config/llm.example.json` 为 `config/llm.local.json`，把 `api_key_env` 指向保存 key 的环境变量，或用 `NK_LLM_BASE` / `NK_LLM_MODEL` / `NK_LLM_KEY` 覆盖。详见 [docs/LLM.md](docs/LLM.md)。
-- **图表解读**：输入确定性引擎输出，输出一句话结论、情景、失效条件与风险提示；不生成价位。
-- **受限参数迭代**：仅在计划样本充足（总数 ≥20、已结束 ≥10）时提出 ≤2 个参数的小幅调整；越界、非数字、未知键一律拒绝；每天最多一次。
-- **自检**：`python3 scripts/llm_check.py` 查看配置；加 `--ping` 做一次真实请求。
-- 未配置 key 时返回 `enabled:false`，系统完整可用；本地 Ollama 端点不要求 key。
+| 类别 | 事件 |
+|---|---|
+| 计划生命周期 | `armed` · `triggered` · `confirmed` · `tp1` · `tp2` · `stopped` · `invalidated` · `expired` |
+| 市场状态 | 方向、结构状态、regime、多周期排列的**切换**（一条汇总消息，含前后值与依据） |
+| 运行异常 | 确认门重分析失败（不再静默卡死） |
 
-### 7. 推送与实时
+- `qq_target` 必须是**单个**群 ID：逗号/分号/空格/换行一律拒绝，不会误发到多个群。
+- 消息格式为 `标的 · 周期 · 方向 / 状态 / 操作 / 触发·止损·目标 / 依据 / 风控 / 数据 + 免责声明`，不推心跳。
+- outbox 具备**退避重试**（瞬时异常不再永久失败）、失败原因落库、按状态去重、静默时段只延迟不销毁、显式 `urgent` 让止损/失效/状态切换优先送达。
+- 状态切换会持久化基线，**服务重启不重放**，相同切换按冷却去重。
+- 本机无 qqbot 时可设 `push_ssh` 走远程网关；命令行参数逐项 quote，不做 shell 拼接。
 
-- 计划状态迁移写入 `outbox`，由 `beagle/push.py` 通过 OpenClaw qqbot 通道推送；设置中开启「QQ 推送」并填写群 target（或环境变量 `BEAGLE_QQ_TARGET`）。
-- 推送去重：同标的同方向 void 后默认 4 小时不再建计划；outbox 对相同文案做 4 小时去重，旧 Beagle monitor 已停用。
-- 推送是简单可执行格式：`标的 · 周期 · 方向` / `状态` / `操作` / `触发/止损/目标` / `依据` / `风控` / `数据 + 免责声明`；只推 `确认 / 目标达成 / 止损 / 失效`，不推心跳。
-- 本机 OpenClaw 没有 qqbot 时，设置 `push_ssh`（例如 `qsp`）通过已配置 qqbot 的远程网关发送；命令行参数逐项 quote，不做 shell 拼接。
-- 触发价到达后先自动重跑分析，确认通过才推送「可执行」建议；未通过推送「结构失效」，不裸触发。
-- 前端通过 SSE `/api/stream` 接收 symbol / plan / settings 事件，同时保留 25s 轮询兜底。
+前端通过 SSE `/api/stream` 接收 symbol/plan/settings 事件，并保留 25s 轮询兜底。
 
-### 8. 自动再分析（到价触发）
+### 自动再分析
 
-引擎除了按 TTL 刷新，还会监控当前价格与支撑/阻力、形态颈线、量度目标的距离；进入 `0.35 × ATR` 区间且超过冷却时间时，自动对该标的执行下一次分析。这样「价格到达可能的关键位」会触发新的判断，而不是等固定轮询。
+除按 TTL 刷新外，引擎还监控现价与支撑阻力、形态颈线、量度目标的距离；进入 `0.35 × ATR` 且超过冷却时间时立即重分析——**价格到达关键位会触发新的判断**，而不是等固定轮询。
+
+---
+
+## 时空分析体系（2.3.0）
+
+不再把 15m/4h 写死为唯一观察窗口。`nakedk/spacetime.py` 从 1h 基础序列重聚合 1h/2h/4h/8h/1d，用「净位移 / 总路程」选出**当前主导尺度**，并给出结构分位、ATR 归一化速度/加速度、关键位触碰的时间衰减权重、UTC 时段与离散状态 ID。所有状态只使用 bar 收盘前的数据，无未来函数。
+
+![时空状态卡片 · 真实运行截图](docs/screenshots/spacetime-2.3.0.png)
+
+`NK_SPACETIME=1` 开启描述性字段（默认关闭、零额外请求、**不参与交易门禁**）。设计与验证结论见 [docs/SPACETIME.md](docs/SPACETIME.md)。
+
+---
+
+## 实测结果（可复现，不粉饰）
+
+**730 天冻结快照 · BTCUSDT + ETHUSDT · 4h · 12bp 往返成本 · test 段只评估一次**
+
+| 指标 | baseline | 采纳的 `v22` 门禁 | 变化 |
+|---|---|---|---|
+| 交易数 | 169 | **51** | −118（更克制） |
+| 平均净收益 | −0.0125% | **+0.1162%** | +0.1287pp |
+| 命中率 | 46.72% | **56.88%** | +10.16pp |
+| 最大回撤 | −12.33% | **−5.11%** | 改善 7.22pp |
+
+12 组扰动压力验证（成本 12/16/20/25bp、单标的、test 前后半段、参数邻域）**胜 11 组，91.7%**。选参用 train 50% / validation 25%，样本量 <30 不得参选，validation 连续无改善早停。通过 `NK_RESEARCH_GATE=1` 启用（默认关闭）。
+
+更早的 150 天实测同样如实保留：基线命中 38.6% / 42.2%、平均净 −0.105% / −0.078%，3 折全负；加入高重叠硬否决与量能确认后 47.6% / 54.1%、−0.033% / +0.206%，第 3 折仍负。**项目不宣称正期望。**
+
+> 「行业最优」不是一个可验证的口径，因此本项目不宣称它。这里提供的是可复现、可证伪、可解释的口径：所有数字都能从入库的冻结快照重新算出来。
+
+```bash
+PYTHONPATH=. python3 research/fetch_history.py     # 冻结快照（sha256 manifest 入库）
+PYTHONPATH=. python3 research/run_backtest.py      # 三段式 walk-forward 选参
+PYTHONPATH=. python3 research/verify_result.py     # 12 组扰动压力验证
+PYTHONPATH=. python3 research/run_spacetime.py     # 时空体系对比
+```
+
+`research/data/*.json.gz` 与 `research/results/*.json` 全部入库，结论口径见 [docs/BACKTEST.md](docs/BACKTEST.md)、[docs/SPACETIME.md](docs/SPACETIME.md) 与 CHANGELOG。
 
 ---
 
 ## 架构
 
-```
-dashboard/
-  index.html            shell only
-  styles.css            professional dark terminal
-  app/
-    main.js             boot / routing / SSE / polling
-    chart.js            Lightweight Charts + canvas annotation layer
-    panels.js           right-hand modules
-    settings.js         symbol pool / intervals / automation / params
-    api.js  store.js  format.js
-
-nakedk/
-  analysis.py           one symbol -> multi-interval chart-ready payload
-  markets.py            Binance / Yahoo / Sina normalised to one kline shape
-  features.py           EMA / ADX / RSI / ATR / volatility / swings
-  structure.py          ZigZag / HH-HL-LH-LL / BOS / CHoCH
-  patterns.py           pattern candidates + scoring
-  annotations.py        drawable geometry (levels / zones / channels / polygons)
-  multi.py              4h + 15m combination
-  plans.py              plan lifecycle state machine (pure)
-  symbol_params.py      per-instrument parameter library + bounds
-  llm.py                optional commentary + guarded tuning
-  params.py             global defaults
-
-beagle/
-  engine.py             analyse -> arm -> trigger -> confirm -> outbox
-  store.py              SQLite plans / plan_events / outbox / legacy events
-  push.py               QQ outbox delivery
-  monitor.py            legacy 1m/5m event monitor
+```mermaid
+flowchart LR
+  A[Binance / Yahoo / 新浪] --> B[markets 归一化 K 线]
+  B --> C[features / structure / patterns]
+  C --> D[multi 双周期合成]
+  C --> E[annotations 几何标注]
+  C --> F[spacetime 时空状态]
+  D --> G[gate 门禁 + plans 计划状态机]
+  G --> H[(SQLite: plans / plan_events / outbox / signals / outcomes)]
+  H --> I[push → 唯一 QQ 群]
+  H --> J[dashboard HTTP + SSE]
+  E --> J
+  F --> J
+  J --> K[Lightweight Charts + Canvas 前端]
 ```
 
-运行时分两条循环：
+运行时两条循环：**analysis**（按 TTL / 到价触发，算特征并刷新计划，重）与 **trigger**（每 20s 只比较价格与计划价位，轻，触发后才做一次完整分析确认）。
 
-- **analysis**：按 TTL / 到价触发，计算特征并刷新计划（重）；
-- **trigger**：每 20s 只比较价格与计划价位（轻），触发后才做一次完整分析确认。
+主要模块：
+
+```
+nakedk/   analysis · markets · features · structure · patterns · annotations
+          multi · plans · spacetime · symbol_params · research_gate · llm · backtest
+beagle/   engine（编排）· store（SQLite）· push（唯一群投递）· score / review / replay
+dashboard/ server.py（HTTP/SSE）· app/*.js（图表、面板、绘图、设置）
+research/  fetch_history · run_backtest · verify_result · run_spacetime · data/ · results/
+```
 
 ---
 
-## 快速开始
+## 30 秒上手
 
 ```bash
 git clone https://github.com/William-Trader/naked-k-analysis.git
 cd naked-k-analysis
-
-# 终端（默认 8080）
-python3 dashboard/server.py
-# 或指定端口
-PORT=8099 python3 dashboard/server.py
-
-# 打开
+python3 dashboard/server.py          # Python 3.10+，无需 pip install
 open http://127.0.0.1:8080/
 ```
 
-要求 Python 3.10+，无需 pip install。首次启动自动建 `beagle.db` 与 `state/`。
-
-独立运行自动化引擎（与 dashboard 二选一，或共用同一个 SQLite）：
-
-```bash
-python3 -m beagle.engine
-```
-
-CLI：
+首次启动自动建 `beagle.db` 与 `state/`。独立引擎：`python3 -m beagle.engine`（可与 dashboard 共用同一 SQLite）。
 
 ```bash
 PYTHONPATH=. python3 -m nakedk fetch BTCUSDT XAU
 PYTHONPATH=. python3 -m nakedk signal XAU
 PYTHONPATH=. python3 -m nakedk knowledge '突破回踩'
-python3 -m unittest discover -s tests
+python3 -m unittest discover -s tests        # 307 passing
 ```
+
+### 安全默认值
+
+**dashboard 默认只绑 `127.0.0.1`**，CORS 默认不开放，500 不再回显 traceback，静态资源在开启 token 后仍可加载（不会白屏）。对外暴露必须显式设置：
+
+```bash
+NK_DASH_HOST=0.0.0.0 \
+NK_DASH_TOKEN='<强随机 token>' \
+PORT=8081 python3 dashboard/server.py
+```
+
+访问 `http://host:8081/?token=<token>`；API 也支持 `Authorization: Bearer <token>`。生产部署清单见 [deploy/INVENTORY.md](deploy/INVENTORY.md)。
 
 ### 环境变量
 
 | 变量 | 作用 | 默认 |
 |---|---|---|
-| `PORT` | dashboard 端口 | `8080` |
-| `BEAGLE_DB` | SQLite 路径 | `<repo>/beagle.db` |
-| `NK_SETTINGS` | 设置文件 | `<repo>/state/settings.json` |
-| `NK_SYMBOL_PROFILES` | 标的参数库 | `<repo>/state/symbol_profiles.json` |
-| `NK_DASH_TOKEN` | 可选 Bearer/查询 token | 空（不鉴权） |
-| `NK_LLM_CONFIG` | LLM 配置文件 | `config/llm.local.json` |
-| `NK_LLM_KEY` | LLM API key（优先级最高） | 空（关闭） |
-| `NK_LLM_KEY_FILE` | 面板输入的 key 文件 | `state/llm.key` |
-| `NK_LLM_BASE` | OpenAI 兼容 base URL | 配置文件 / `https://api.openai.com/v1` |
-| `NK_LLM_MODEL` | 模型名 | 配置文件 / `gpt-4o-mini` |
-| `BEAGLE_QQ_TARGET` | qqbot 推送目标 | 空（不推） |
+| `PORT` / `NK_DASH_HOST` | 端口 / 监听地址 | `8080` / `127.0.0.1` |
+| `NK_DASH_TOKEN` | Bearer 或查询 token | 空（不鉴权） |
+| `NK_DASH_CORS_ORIGINS` | 允许的来源，逗号分隔；`*` 允许全部 | 空（禁跨域） |
+| `BEAGLE_DB` | SQLite 路径（**所有组件共用**） | `<repo>/beagle.db` |
+| `NK_SETTINGS` / `NK_SYMBOL_PROFILES` | 设置 / 标的参数库 | `<repo>/state/…` |
+| `NK_RESEARCH_GATE` | 启用经样本外验证的 `v22` 门禁 | 关闭 |
+| `NK_SPACETIME` | 输出时空描述字段 | 关闭 |
+| `NK_MARKET_BASE` | 行情端点（可切镜像） | `data-api.binance.vision` |
+| `NK_LLM_CONFIG` / `NK_LLM_KEY` / `NK_LLM_KEY_FILE` | LLM 配置与密钥 | 见 `config/llm.example.json` |
+| `NK_LLM_BASE` / `NK_LLM_MODEL` | OpenAI 兼容端点 / 模型 | 配置文件 |
+| `BEAGLE_QQ_TARGET` | **唯一**推送群目标 | 空（不推） |
 | `BEAGLE_PUSH_SSH` | 通过远程网关发送的 SSH host | 空（本机） |
 
 ---
@@ -196,72 +225,32 @@ python3 -m unittest discover -s tests
 
 | Endpoint | 说明 |
 |---|---|
-| `GET /api/health` | 服务/引擎/LLM/计划统计 |
-| `GET /api/universe` | 全部标的、市场、provider、周期 |
-| `GET /api/overview?symbols=&intervals=` | 多标的概览 |
-| `GET /api/symbol?symbol=&force=` | 单标的完整分析 + 计划 + 事件 |
-| `GET /api/plans` | 开放计划 / 历史 / 事件 / 统计 |
-| `POST /api/analyze` | 立即重算一个标的 |
-| `POST /api/plan/action` | 手动作废计划 |
-| `GET/POST /api/settings` | 标的池 / 周期 / 自动化 / LLM 开关 |
-| `GET/POST /api/symbol-params` | 单标的参数读写、LLM 建议、回滚 |
-| `GET /api/llm/status` | LLM 是否可用 |
-| `POST /api/llm/annotate` | 生成图表解读 |
-| `POST /api/llm/optimize` | 受限参数建议（可显式 apply） |
-| `GET /api/stream` | SSE 实时事件 |
-| `GET /api/knowledge` | 知识库模块/原文 |
-
----
-
-## 准确度与边界（如实）
-
-本项目此前的实测结论仍然有效：
-
-- BTC/ETH 近 150 天、900 根 4h、12bp 成本：基线命中 38.6% / 42.2%，平均净 −0.105% / −0.078%，3 折全负；
-- 加入高重叠硬否决与量能确认后：47.6% / 54.1%，平均净 −0.033% / +0.206%，正收益折 2/3，第 3 折仍负；
-- **仍不宣称正期望**。计划状态与置信度是描述性质量分级，不是概率承诺。
-
-因此系统把「不交易」当作合法输出：中性/冲突时不出计划，置信不足时不发确认，结构失效时立即作废。计划台账（`plan_events`）用于后续按 setup / regime / 周期分桶复盘，而不是用单次结果讲故事。
-
----
-
-## 研究与回测
-
-历史行情与回测可复现，冻结快照纳入版本库以便任何人基于同一份数据复核：
-
-```bash
-# 冻结历史行情快照（写入 research/data/，快照入库）
-python3 research/fetch_history.py
-
-# 查看回测参数并运行 walk-forward 验证
-python3 research/run_backtest.py --help
-```
-
-- `research/data/*.json.gz` 与 `research/data/manifest.json` 作为冻结快照入库（`.gitignore` 已放行），保证结论可复现。
-
-```bash
-PYTHONPATH=. python3 research/run_backtest.py      # 三段式 walk-forward 选参
-PYTHONPATH=. python3 research/verify_result.py     # 12 组样本外扰动压力验证
-PYTHONPATH=. python3 research/run_spacetime.py     # 自适应时空体系对比
-```
-
-**2.2.0 样本外结论**（730 天冻结数据、BTCUSDT+ETHUSDT、4h、12bp 成本、test 段只评估一次）：baseline 169 笔、平均净 −0.0125%、命中 46.72%、最大回撤 −12.33%；采纳的 `v22` 门禁 + 参数为 51 笔、+0.1162%、56.88%、−5.11%。12 组扰动场景胜 11 组。可通过 `NK_RESEARCH_GATE=1` 启用（默认关闭）。
-
-**2.3.0 时空体系**：[docs/SPACETIME.md](docs/SPACETIME.md) 描述自适应尺度轴与价格结构状态；`NK_SPACETIME=1` 开启描述性分析字段（默认关闭、不参与门禁）。其规则在验证中未超过 2.2.0 champion，且 test 段被复用过，因此**未采纳为交易门禁**。
-
-本页与所有研究脚本**不承诺正期望、不宣称「行业最优」**；所有数字均可从冻结快照复现，结论口径见 [docs/BACKTEST.md](docs/BACKTEST.md)、[docs/SPACETIME.md](docs/SPACETIME.md) 与 CHANGELOG。
+| `GET /api/health` | 服务 / 引擎 / LLM / 计划统计（含版本号） |
+| `GET /api/universe` · `/api/overview` · `/api/symbol` | 标的池 · 多标的概览 · 单标的完整分析 |
+| `GET /api/plans` · `/api/events` · `/api/knowledge` | 计划台账 · 事件 · 知识库 |
+| `POST /api/analyze` · `/api/plan/action` | 立即重算 · 手动作废 |
+| `GET/POST /api/settings` · `/api/symbol-params` | 设置 · 标的参数读写/建议/回滚 |
+| `GET /api/llm/status` · `POST /api/llm/annotate` · `/api/llm/optimize` | LLM 状态与受限能力 |
+| `GET/POST /api/drawings` · `GET /api/stream` | 绘图持久化 · SSE 实时事件 |
 
 ---
 
 ## 工程约束
 
 1. **零第三方依赖**：Python 标准库 + SQLite；图表库本地 vendor（Apache 2.0，见 `NOTICE.md`）。
-2. **单一分析路径**：dashboard、CLI、引擎都调用 `nakedk/analysis.py`，不各自推导。
+2. **单一分析路径**：dashboard / CLI / 引擎都调用 `nakedk/analysis.py`，不各自推导。
 3. **单一计划事实源**：前端与 QQ 都读同一个 plan / plan_event，避免「群里说 A、页面说 B」。
-4. **幂等**：`plan_events.idempotency_key` + `outbox(plan_event_id, channel)` 唯一约束。
-5. **门禁只做减法**：新增过滤必须有实测依据；不因「看起来更好」而放宽。
-6. **测试只增不减**：259 个单测通过；新增模块带纯函数测试，后续新增回归测试会继续增加该数字。
-7. **安全默认值**：dashboard 默认只绑 `127.0.0.1`，对外暴露需显式设置 `NK_DASH_HOST` 与 `NK_DASH_TOKEN`。
+4. **单一数据库**：`BEAGLE_DB` 统一计划、事件、信号、结果与评分链路。
+5. **幂等**：`plan_events.idempotency_key` + `outbox(plan_event_id, channel)` 唯一约束。
+6. **门禁只做减法**：新增过滤必须有实测依据；不因「看起来更好」而放宽。
+7. **测试只增不减**：307 个单测全绿，新增模块必须带测试。
+8. **安全默认值**：默认绑本机、默认禁跨域、默认不启用可选分析层。
+
+---
+
+## 移动端
+
+![移动端 · 真实运行截图](docs/screenshots/mobile-2.3.0.png)
 
 ---
 
@@ -273,5 +262,6 @@ PYTHONPATH=. python3 research/run_spacetime.py     # 自适应时空体系对比
 
 ## License
 
-[Personal Use & Group Exchange License](LICENSE)。仅供个人使用与团体交流；禁止商业用途。
-水印（`WM: NKA-XXXXXXXX`）是部分核心文件的来源标记，并非覆盖全部源文件；已标记文件清单见 [WATERMARK.md](WATERMARK.md)。新增文件改用 SPDX 头。
+[Personal Use & Group Exchange License](LICENSE)。**仅供个人使用与团体交流；禁止商业用途。**
+
+水印（`WM: NKA-XXXXXXXX`）是部分核心文件的来源标记，并非覆盖全部源文件；已标记清单见 [WATERMARK.md](WATERMARK.md)。新增文件改用 SPDX 头。

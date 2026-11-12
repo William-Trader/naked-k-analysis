@@ -2,7 +2,7 @@
 
 ## 2.3.0 — 2026-11-12
 
-新增**自适应时空分析体系**（`nakedk/spacetime.py`），不推倒、不替换现有分析链路。
+新增**自适应时空分析体系**（`nakedk/spacetime.py`）、**全状态 QQ 推送**，并完成 101 生产部署与真实前端展示。不推倒、不替换现有分析链路。
 
 ### 新增
 - 时间轴：从 1h 基础序列重聚合 1h/2h/4h/8h/1d，用「净位移/总路程」选 `dominant_scale`；**不再先验固定 15m 为执行框架**。
@@ -17,9 +17,26 @@
 - 更关键：v2 规则是在看过 v1 test 之后修改的，test 段已被使用两次，**不再构成干净的样本外验证**。继续按它调规则属于数据窥探。
 - 因此时空体系**不晋升为交易门禁**，定位为描述性分析层；门禁仍以 v22 champion 为准（其 test 仅评估一次）。晋升需全新独立数据段做一次性验证。详见 [docs/SPACETIME.md](docs/SPACETIME.md) 与 `research/results/spacetime_2.3.0.json`。
 
+### 全状态推送到唯一 QQ 群
+- `push_severity` 白名单从 6 类扩展到全部生命周期事件：`armed / triggered / confirmed / tp1 / tp2 / stopped / invalidated / expired / state_change / confirm_error`。
+- 新增 `market_events` 表与 `notify_market_state()`：方向、结构、regime、MTF 任一切换即推一条汇总消息（含前后值与依据）；持久化基线、重启不重放、相同切换按冷却去重。
+- `qq_target` **硬校验单群**（逗号/分号/空格/换行一律拒绝），`push_outbox` 遇非法目标返回 `invalid_target` 而不是乱发。
+- `outbox.urgent` 显式标记止损/失效/触发/状态切换/异常，绕过静默时段；不再依赖文案关键词。
+- 生产端到端验证：自检消息首次因 qqbot WebSocket 断连失败，**退避重试第 3 次送达唯一群**，队列 110/110 `sent`。
+
+### 生产部署（101）
+- 全量备份 `/opt/apps/nakedk-dashboard` 与 systemd 配置，落地 `rollback-2.3.0.sh`；归档 sha256 双端校验一致后排除 `state/`、密钥、`*.db` 同步。
+- schema 幂等迁移：WAL、`outbox.last_error/next_attempt_at/urgent`、`signals.plan_id` 与唯一索引、`market_events` 表。
+- 老链路 526 条 signals + 526 条 outcomes 合并进主库；`record/score/review` 通过 drop-in 统一 `BEAGLE_DB`，消除数据孤岛。
+- 启用 `NK_RESEARCH_GATE=1`（样本外验证过的门禁）、`NK_SPACETIME=1`（描述性字段）、强 token + 默认禁跨域；`/api/health` 报 2.3.0，不带 token 401、静态资源 200、无 ACAO 头。
+
+### 文档与展示
+- 新增 3 张**生产实例真实截图**：桌面全貌、时空状态卡片、移动端；README 重写为可扫读结构（价值主张、能力矩阵、实测对比表、Mermaid 架构图、30 秒上手、安全默认值）。
+
 ### 兼容性
-- 纯新增模块 + 可选环境变量；默认行为、API 响应结构（新增可空字段除外）、数据库 schema 均不变。
-- 新增 `tests/test_spacetime.py` 覆盖无未来函数、尺度自适应、规则可解释性。
+- 纯新增模块 + 可选环境变量；默认行为、API 响应结构（新增可空字段除外）、数据库 schema 均通过幂等迁移扩展。
+- 新增 `tests/test_spacetime.py`（无未来函数、尺度自适应、可解释性）与 `tests/test_push_coverage.py`（唯一群、全事件覆盖、状态切换去重与重启恢复）。
+- **单测 307 全绿**（259 原有 + 48 新增）。
 
 ## 2.2.0 — 2026-11-12
 
@@ -41,7 +58,7 @@
 - 样本外结果（test）：baseline 169 笔 / 平均净 −0.0125% / 命中 46.72% / 最大回撤 −12.33%；采纳 `v22` 门禁 + `adx_min=22, stop=1.5ATR, target=3ATR` 后 **51 笔 / +0.1162% / 56.88% / −5.11%**（净收益 +0.1287pp、命中 +10.16pp、回撤改善 7.22pp、交易数 −118）。
 - 压力验证 `python3 research/verify_result.py`：成本 12/16/20/25bp、单标的、test 前后半段、参数邻域共 **12 组场景胜 11 组（91.7%）**，唯一失败为 test 后半段；结果见 `research/results/verification_2.2.0.json`。
 - 落地方式：`NK_RESEARCH_GATE=1` 可选启用（`nakedk/research_gate.py`），**默认关闭**以保持兼容；历史模拟不构成正期望声明。
-- 单测由 259 增至 **294 全绿**（+2 门禁对称性用例、+22 项审计回归、+11 项时空引擎用例；含 2.3.0 新增部分）。
+- 单测由 259 增至 **307 全绿**（+2 门禁对称性、+22 审计回归、+11 时空引擎、+13 推送覆盖；含 2.3.0 新增部分）。
 
 ### 兼容性
 - 所有部署侧新行为都有环境变量开关或为纯文档 / 忽略规则，不删除既有功能。
