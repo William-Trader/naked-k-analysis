@@ -272,7 +272,7 @@ function renderRail(st) {
   const active = (st.settings.active_symbols || Object.keys(st.symbols));
   $('sym-rail').innerHTML = active.map(s => {
     const u = (st.universe || []).find(x => x.symbol === s) || { symbol: s, name: s };
-    return `<button class="tab ${s === st.active ? 'on' : ''}" data-sym="${s}"
+    return `<button class="tab ${s === st.active ? 'on' : ''}" data-sym="${esc(String(s))}"
       title="${esc(u.name)}">${esc(s.replace('USDT', '/USDT'))}</button>`;
   }).join('');
 }
@@ -300,7 +300,7 @@ function renderTF(st, p) {
   if (!rail) return;
   if (!order.includes(st.interval) && order.length) state.interval = order[0];
   rail.innerHTML = order.map(tf =>
-    `<button data-tf="${tf}" class="${tf === st.interval ? 'on' : ''}">${tf.toUpperCase()}</button>`
+    `<button data-tf="${esc(String(tf))}" class="${tf === st.interval ? 'on' : ''}">${esc(String(tf).toUpperCase())}</button>`
   ).join('');
 }
 

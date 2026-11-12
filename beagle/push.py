@@ -133,7 +133,9 @@ def push_pending(cfg: dict, db_path: str, dry_run: bool = False, limit: int = 20
                             "age_min": round((now_ms - int(a["created_at"])) / 60_000, 1)})
             continue
         if a["severity"] == "P2":
-            store.mark_status(db_path, a["id"], "p2_deferred")
+            # Deferred, not terminal: p2_deferred was never picked up again by
+            # pending_alerts(), so every P2 alert was silently lost forever.
+            store.fail_alert(db_path, a["id"], "p2_deferred", cfg.get("max_push_attempts", 5))
             results.append({"id": a["id"], "status": "p2_deferred"})
             continue
         if _quiet(time.localtime().tm_hour, cfg) and a["severity"] != "P0":
@@ -181,39 +183,57 @@ def push_outbox(db_path: str, cfg: dict | None = None, dry_run: bool = False,
     now_hour = time.localtime().tm_hour
     now_ms = int(time.time() * 1000)
     max_age = int((cfg or {}).get("max_alert_age_min", 30) or 0) * 60_000
+    max_attempts = int(cfg.get("max_push_attempts", 5) or 5)
     for row in store.outbox_pending(db_path, limit):
-        if max_age and row.get("created_at") and now_ms - int(row["created_at"]) > max_age:
-            store.outbox_mark(db_path, row["id"], "stale")
-            out.append({"id": row["id"], "status": "stale_skip"})
-            continue
+        oid = row["id"]
         if dry_run:
-            out.append({"id": row["id"], "status": "dry",
-                        "text": row.get("text", "")[:120]})
-            continue
-        if not target:
-            out.append({"id": row["id"], "status": "no_target"})
+            out.append({"id": oid, "status": "dry", "text": row.get("text", "")[:120]})
             continue
         urgent = any(k in (row.get("text") or "")
                      for k in ("止损离场", "结构失效", "计划超时"))
+        # Quiet hours must defer, not destroy. The old code checked staleness
+        # BEFORE the quiet gate, so messages born at 23:00 died at 23:30 and
+        # the same 20 pending rows blocked the queue as head-of-line.
         if _quiet(now_hour, cfg) and not urgent:
-            out.append({"id": row["id"], "status": "quiet_skip"})
+            store.outbox_mark(db_path, oid, "pending", "quiet_hours",
+                              next_attempt_at=now_ms + 5 * 60_000)
+            out.append({"id": oid, "status": "quiet_skip"})
+            continue
+        if max_age and row.get("created_at") and \
+                now_ms - int(row["created_at"]) > max_age and not urgent:
+            store.outbox_mark(db_path, oid, "stale", "expired after quiet hours")
+            out.append({"id": oid, "status": "stale_skip"})
+            continue
+        if not target:
+            store.outbox_mark(db_path, oid, "pending", "no_target",
+                              next_attempt_at=now_ms + 60_000)
+            out.append({"id": oid, "status": "no_target"})
             continue
         args = ["message", "send", "--channel", "qqbot",
                 "--target", target, "--message", row["text"]]
+        err, rc = "", 0
         try:
             p = _run_send(args, cfg)
+            rc = p.returncode
+            err = (p.stderr or p.stdout or "")[:200] if rc else ""
         except Exception as e:
-            store.outbox_mark(db_path, row["id"], "failed", str(e)[:200])
-            out.append({"id": row["id"], "status": "failed",
-                        "err": str(e)[:160]})
+            rc, err = -1, str(e)[:200]
+        if rc == 0:
+            store.outbox_mark(db_path, oid, "sent")
+            out.append({"id": oid, "status": "sent"})
             continue
-        if p.returncode == 0:
-            store.outbox_mark(db_path, row["id"], "sent")
-            out.append({"id": row["id"], "status": "sent"})
+        attempts = int(row.get("attempts") or 0) + 1
+        if attempts >= max_attempts:
+            # Genuinely terminal, but now with the reason persisted.
+            store.outbox_mark(db_path, oid, "failed", err)
+            new_status = "failed"
         else:
-            err = (p.stderr or p.stdout or "")[:200]
-            attempts = int(row.get("attempts") or 0) + 1
-            status = "failed" if attempts >= int(cfg.get("max_push_attempts", 5)) else "pending"
-            store.outbox_mark(db_path, row["id"], status, err)
-            out.append({"id": row["id"], "status": status, "err": err})
+            # One transient exception used to permanently kill the message:
+            # outbox_pending() only selects status='pending'.
+            backoff = min(300_000, 15_000 * (2 ** min(attempts, 5)))
+            store.outbox_mark(db_path, oid, "pending", err,
+                              next_attempt_at=now_ms + backoff)
+            new_status = "pending"
+        out.append({"id": oid, "status": new_status, "attempts": attempts,
+                    "err": err})
     return out

@@ -49,6 +49,13 @@ BOUNDS = {
     "plan_ttl_h": (4, 48),
     "plan_risk_pct": (0.1, 2.0),
     "plan_min_confluence": (30.0, 80.0),
+    # Previously unbounded: any numeric value (negative / 1e9) could be
+    # persisted for these keys and silently disable the plan engine.
+    "plan_trigger_max_atr": (0.2, 5.0),
+    "plan_confirm_bars": (1, 12),
+    "plan_max_open": (1, 8),
+    "trend_label_strong_up": (50.0, 95.0),
+    "trend_label_strong_down": (5.0, 50.0),
 }
 
 # extra plan-level keys are not part of nakedk.params.DEFAULTS
@@ -102,7 +109,10 @@ def get(symbol: str, path=None) -> dict:
         prof = _read(path).get(_norm(symbol)) or {}
     over = prof.get("params") or {}
     for k, v in over.items():
-        if k in base and isinstance(v, (int, float)):
+        if k in base and isinstance(v, (int, float)) and not isinstance(v, bool):
+            if k in BOUNDS:
+                lo, hi = BOUNDS[k]
+                v = max(lo, min(hi, float(v)))
             base[k] = v
     return base
 

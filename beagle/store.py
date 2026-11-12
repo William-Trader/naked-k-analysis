@@ -135,6 +135,15 @@ CREATE TABLE IF NOT EXISTS state (
 def connect(path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(path, timeout=15)
     conn.row_factory = sqlite3.Row
+    # WAL lets the HTTP thread read while the engine writes; busy_timeout
+    # replaces the old "database is locked" errors that were swallowed by
+    # bare `except: pass` in the loops.
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=15000")
+        conn.execute("PRAGMA synchronous=NORMAL")
+    except Exception:
+        pass
     return conn
 
 
@@ -163,9 +172,19 @@ def init(path: str) -> None:
             ("setup", "ALTER TABLE signals ADD COLUMN setup TEXT"),
             ("regime", "ALTER TABLE signals ADD COLUMN regime TEXT"),
             ("mtf_alignment", "ALTER TABLE signals ADD COLUMN mtf_alignment INTEGER"),
+            ("plan_id", "ALTER TABLE signals ADD COLUMN plan_id INTEGER"),
         ):
             if col not in scols:
                 conn.execute(ddl)
+        bcols = [r[1] for r in conn.execute("PRAGMA table_info(outbox)").fetchall()]
+        for col, ddl in (
+            ("last_error", "ALTER TABLE outbox ADD COLUMN last_error TEXT"),
+            ("next_attempt_at", "ALTER TABLE outbox ADD COLUMN next_attempt_at INTEGER DEFAULT 0"),
+        ):
+            if col not in bcols:
+                conn.execute(ddl)
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_signals_plan "
+                     "ON signals(plan_id) WHERE plan_id IS NOT NULL")
         conn.commit()
     finally:
         conn.close()
@@ -581,7 +600,8 @@ def outbox_add(path: str, plan_event_id: int, channel: str, text: str,
         if dedupe_min and dedupe_min > 0:
             since = _now() - int(dedupe_min) * 60_000
             row = conn.execute(
-                "SELECT id FROM outbox WHERE channel=? AND text=? AND created_at>=? LIMIT 1",
+                "SELECT id FROM outbox WHERE channel=? AND text=? AND created_at>=? "
+                "AND status IN ('pending','sent') LIMIT 1",
                 (channel, text, since)).fetchone()
             if row:
                 return None
@@ -595,14 +615,21 @@ def outbox_add(path: str, plan_event_id: int, channel: str, text: str,
         conn.close()
 
 
-def recent_void_plan(path: str, symbol: str, side: str, since_ms: int):
-    """Latest voided plan for the same symbol/side inside a re-arm cooldown."""
+def recent_void_plan(path: str, symbol: str, side: str | None, since_ms: int):
+    """Latest voided plan inside the re-arm cooldown.
+
+    Pass side=None for symbol-level cooling. Side-scoped lookups allowed a
+    direction flip (long void -> short candidate) to bypass the cooldown.
+    """
     conn = connect(path)
     try:
-        row = conn.execute(
-            "SELECT id,setup,updated_at,outcome FROM plans WHERE symbol=? AND side=? "
-            "AND status='void' AND updated_at>=? ORDER BY id DESC LIMIT 1",
-            (symbol, side, since_ms)).fetchone()
+        sql = ("SELECT id,setup,updated_at,outcome FROM plans WHERE symbol=? "
+               "AND status='void' AND updated_at>=? ")
+        args = [symbol, since_ms]
+        if side is not None:
+            sql += "AND side=? "
+            args.append(side)
+        row = conn.execute(sql + "ORDER BY id DESC LIMIT 1", args).fetchone()
         return dict(row) if row else None
     finally:
         conn.close()
@@ -611,18 +638,56 @@ def recent_void_plan(path: str, symbol: str, side: str, since_ms: int):
 def outbox_pending(path: str, limit: int = 20):
     conn = connect(path)
     try:
+        # Order by retry time so a skipped head-of-line row cannot starve the
+        # rest of the queue for its whole 30min lifetime.
         return [dict(r) for r in conn.execute(
-            "SELECT * FROM outbox WHERE status='pending' ORDER BY id LIMIT ?",
-            (limit,)).fetchall()]
+            "SELECT * FROM outbox WHERE status='pending' "
+            "AND (next_attempt_at IS NULL OR next_attempt_at<=?) "
+            "ORDER BY COALESCE(NULLIF(next_attempt_at,0), created_at), id LIMIT ?",
+            (_now(), limit)).fetchall()]
     finally:
         conn.close()
 
 
-def outbox_mark(path: str, oid: int, status: str, err: str = ""):
+def outbox_mark(path: str, oid: int, status: str, err: str = "",
+                next_attempt_at: int | None = None):
     conn = connect(path)
     try:
-        conn.execute("UPDATE outbox SET status=?, attempts=attempts+1, sent_at=? "
-                     "WHERE id=?", (status, _now() if status == "sent" else None, oid))
+        conn.execute(
+            "UPDATE outbox SET status=?, attempts=attempts+1, sent_at=?, "
+            "last_error=?, next_attempt_at=? WHERE id=?",
+            (status, _now() if status == "sent" else None, str(err or "")[:300],
+             int(next_attempt_at or 0), oid))
         conn.commit()
+    finally:
+        conn.close()
+
+
+def record_plan_signal(path: str, plan: dict) -> int | None:
+    """Bridge the plan ledger into the signals/outcomes scoring chain.
+
+    Before 2.2.0 plans and signals lived in two different SQLite files, so
+    the weekly review/calibration had zero samples from the actual plans.
+    Idempotent via the partial unique index on signals(plan_id).
+    """
+    pid = plan.get("id")
+    if not pid or plan.get("status") not in ("closed", "void"):
+        return None
+    snap = plan.get("snapshot") or {}
+    conn = connect(path)
+    try:
+        conn.execute(
+            "INSERT OR IGNORE INTO signals "
+            "(ts,symbol,direction,confidence,entry,stop,target,horizon_h,source,"
+            " setup,regime,mtf_alignment,plan_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (int(plan.get("created_at") or _now()), plan.get("symbol"),
+             plan.get("side"), int(float(plan.get("confidence") or 50)),
+             plan.get("trigger"), plan.get("stop"), plan.get("target1"), 4,
+             "plan", plan.get("setup"),
+             ((snap.get("structure") or {}).get("state")),
+             ((snap.get("mtf") or {}).get("alignment")), pid))
+        conn.commit()
+        row = conn.execute("SELECT id FROM signals WHERE plan_id=?", (pid,)).fetchone()
+        return row["id"] if row else None
     finally:
         conn.close()

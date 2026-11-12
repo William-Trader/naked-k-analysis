@@ -142,8 +142,13 @@ def _score(p, f, ks, atr):
     if rng > 0:
         if body / rng > 0.6:
             sb += 4
-        if (_f(last[4]) - _f(last[1])) * (1 if p["direction"] == "bullish" else -1) > 0:
-            sb += 3
+        # Neutral patterns (triangles / symmetrical flags) carry no directional
+        # body bias: scoring them as bearish used to reward bear candles.
+        d = p.get("direction")
+        if d in ("bullish", "bearish"):
+            sign = 1 if d == "bullish" else -1
+            if (_f(last[4]) - _f(last[1])) * sign > 0:
+                sb += 3
         if upper < rng * 0.25 or lower < rng * 0.25:
             sb += 2
         if idx >= 1:

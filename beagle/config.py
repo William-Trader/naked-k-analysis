@@ -35,6 +35,13 @@ def load(path: str | None = None) -> dict:
         with open(path, encoding="utf-8") as fh:
             user = json.load(fh)
         _deep_update(cfg, user)
+    # Single source of truth: the dashboard/plan engine uses BEAGLE_DB.
+    # Without this override the monitor/score/review timers wrote to a second
+    # SQLite file (relative "beagle.db" under their own working directory),
+    # leaving the plan ledger with zero scored samples.
+    env_db = os.environ.get("BEAGLE_DB")
+    if env_db:
+        cfg["db_path"] = env_db
     return cfg
 
 

@@ -7,7 +7,7 @@ const $ = id => document.getElementById(id);
 
 function card(title, sub, body, cls = '') {
   return `<section class="card ${cls}">
-    <div class="card-h"><b>${title}</b><span>${sub || ''}</span></div>
+    <div class="card-h"><b>${esc(String(title))}</b><span>${esc(String(sub || ''))}</span></div>
     <div class="card-b">${body}</div>
   </section>`;
 }
@@ -56,7 +56,7 @@ function multiTfCard(p) {
     const st = iv.stance || {};
     const tr = iv.trend || {};
     const col = st.direction === 'long' ? 'var(--up)' : st.direction === 'short' ? 'var(--down)' : 'var(--muted)';
-    return `<div class="list-row tf-row" data-act="right-interval" data-tf="${tf}" style="cursor:pointer">
+    return `<div class="list-row tf-row" data-act="right-interval" data-tf="${esc(String(tf))}" style="cursor:pointer">
       <span class="mono" style="min-width:34px;color:${tf === cur ? 'var(--gold)' : 'var(--text-dim)'}">${tf.toUpperCase()}</span>
       <span style="color:${col};min-width:44px">${dirCN(st.direction)}</span>
       <span class="mono">${st.confidence ?? '—'}</span>
@@ -99,7 +99,7 @@ function planCard(p) {
     ${plan.invalidation ? `<div class="plan-inval">失效条件：${esc(plan.invalidation)}</div>` : ''}
     ${ev.length ? `<div class="v-reasons" style="margin-top:6px">${ev.slice(0, 2).map(esc).join('<br>')}</div>` : ''}
     <div class="plan-actions">
-      <button class="ghost-btn" data-act="void-plan" data-id="${plan.id}">作废计划</button>
+      <button class="ghost-btn" data-act="void-plan" data-id="${esc(String(plan.id))}">作废计划</button>
       <button class="ghost-btn" data-act="analyze">重新分析</button>
     </div>
   `);
@@ -114,7 +114,7 @@ function intervalCard(p) {
   const f = iv.features || {};
   const struct = iv.structure || {};
   const pats = (iv.patterns || []).slice(0, 4);
-  const tabs = order.map(x => `<button data-act="right-interval" data-tf="${x}" class="${x === tf ? 'on' : ''}">${x}</button>`).join('');
+  const tabs = order.map(x => `<button data-act="right-interval" data-tf="${esc(String(x))}" class="${x === tf ? 'on' : ''}">${esc(String(x))}</button>`).join('');
   const patRows = pats.length ? pats.map(x => {
     const col = x.direction === 'bullish' ? 'var(--up)' : x.direction === 'bearish' ? 'var(--down)' : 'var(--muted)';
     const q = Math.max(0, Math.min(100, x.quality || 0));
@@ -219,6 +219,33 @@ function systemCard(p, st) {
   `);
 }
 
+function spacetimeCard(p) {
+  const st = p.spacetime;
+  if (!st) return '';
+  if (st.error) return card('时空状态', 'SPACETIME',
+    `<div class="muted">不可用：${esc(st.error)}</div>`);
+  const s = st.state || {};
+  if (!s.complete) return card('时空状态', 'SPACETIME',
+    '<div class="muted">历史不足，状态未生成</div>');
+  const scales = Object.entries(s.scale_scores || {})
+    .map(([k, v]) => `${esc(k)}h ${Number(v).toFixed(2)}`).join(' · ');
+  return card('时空状态', 'SPACETIME · ' + esc(st.rules || 'v2'), `
+    <div class="kv">
+      <div><span>主导尺度</span><b>${esc(String(s.dominant_scale_h))}h</b></div>
+      <div><span>状态</span><b>${esc(s.regime)} / ${esc(s.position_bucket)}</b></div>
+      <div><span>结构分位</span><b>${Number(s.position).toFixed(2)}</b></div>
+      <div><span>路径效率</span><b>${Number(s.path_efficiency).toFixed(2)}</b></div>
+      <div><span>速度 / 加速度</span><b>${Number(s.velocity).toFixed(2)} / ${Number(s.acceleration).toFixed(2)} ATR</b></div>
+      <div><span>关键位触碰</span><b>${esc(String(s.level_touches))} 次 · 权重 ${Number(s.level_touch_weight).toFixed(2)}</b></div>
+      <div><span>时段</span><b>${esc(s.session)}</b></div>
+      <div><span>状态 ID</span><b>${esc(s.state_id)}</b></div>
+    </div>
+    <div class="muted" style="font-size:9.5px;margin-top:6px">各尺度效率 ${scales}</div>
+    <div class="muted" style="font-size:9.5px">${esc(st.explain || '')}</div>
+    <div class="muted" style="font-size:9.5px">描述性字段，不参与交易门禁。</div>
+  `);
+}
+
 export function renderPanels(el, st) {
   const p = st.symbols[st.active];
   if (!p || p.error) {
@@ -235,6 +262,7 @@ export function renderPanels(el, st) {
     intervalCard(p),
     levelsCard(p, tf),
     llmCard(p, st),
+    spacetimeCard(p),
     eventsCard(p),
     systemCard(p, st)
   ].join('');

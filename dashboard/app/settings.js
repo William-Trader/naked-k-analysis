@@ -67,8 +67,8 @@ function renderUniverse(q) {
   document.getElementById('universe-list').innerHTML = Object.entries(groups).map(([g, items]) => `
     <div class="ugroup">${esc(g)}</div>
     ${items.map(x => `
-      <label class="uitem ${selected.has(x.symbol) ? 'on' : ''}" data-sym="${x.symbol}">
-        <input type="checkbox" data-sym="${x.symbol}" ${selected.has(x.symbol) ? 'checked' : ''}>
+      <label class="uitem ${selected.has(x.symbol) ? 'on' : ''}" data-sym="${esc(String(x.symbol))}">
+        <input type="checkbox" data-sym="${esc(String(x.symbol))}" ${selected.has(x.symbol) ? 'checked' : ''}>
         <span class="code">${esc(x.symbol)}</span>
         <span class="nm">${esc(x.name)}</span>
         ${x.default ? '<span class="tag">默认</span>' : ''}

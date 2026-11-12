@@ -41,7 +41,9 @@ from .legs import decompose as leg_decompose, maturity as leg_maturity, exhausti
 from .quality import gates as data_gates
 from .signalbar import score as signalbar_score
 
-BASE = "https://data-api.binance.vision"
+# Public market-data mirror (no API key). Overridable so research can pin a
+# different endpoint or replay through a local mirror; keeps the old default.
+BASE = os.environ.get("NK_MARKET_BASE", "https://data-api.binance.vision")
 CST = timezone(timedelta(hours=8))
 
 

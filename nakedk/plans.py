@@ -75,12 +75,22 @@ def rr(plan: dict) -> float | None:
 
 
 def trigger_mode(price: float, trigger: float) -> str:
-    """below = wait for a pullback; above = wait for a breakout."""
+    """below = wait for a pullback; above = wait for a breakout.
+
+    A trigger *near* the current price is NOT an automatic market order. The
+    old implementation returned "market" whenever the relative distance was
+    below 0.0008, so the 0.15*ATR pullback fallback (typically 0.00075 for
+    BTC) armed a plan that `evaluate()` fired on the very next 20s tick with
+    no price movement at all. "market" is now only produced when a caller
+    explicitly asks for it (see `trigger_mode_hint` on `build`).
+    """
     if trigger is None or price is None:
         return "market"
-    if abs(trigger - price) / max(price, 1e-9) < 0.0008:
-        return "market"
-    return "below" if trigger < price else "above"
+    if trigger < price:
+        return "below"
+    if trigger > price:
+        return "above"
+    return "market"  # exact equality: genuinely immediate, caller must opt in
 
 
 def build(symbol: str, interval: str, side: str, *, price: float, atr: float,
@@ -88,7 +98,8 @@ def build(symbol: str, interval: str, side: str, *, price: float, atr: float,
           setup: str = "", confidence: float = 50, grade: str = "C",
           snapshot: dict | None = None, ttl_h: float = 12,
           params_version: int = 0, invalidation: str = "",
-          now_ms: int | None = None, min_rr: float = 1.5) -> dict | None:
+          now_ms: int | None = None, min_rr: float = 1.5,
+          trigger_mode_hint: str | None = None) -> dict | None:
     """Create a plan dict; return None when the geometry is not tradable."""
     if side not in SIDES or not price or not atr:
         return None
@@ -115,7 +126,7 @@ def build(symbol: str, interval: str, side: str, *, price: float, atr: float,
         "setup": setup or "price_action",
         "status": "armed",
         "trigger": _r(trigger),
-        "trigger_mode": trigger_mode(float(price), float(trigger)),
+        "trigger_mode": trigger_mode_hint or trigger_mode(float(price), float(trigger)),
         "stop": _r(stop),
         "target1": _r(target1),
         "target2": _r(target2),
@@ -200,12 +211,17 @@ def evaluate(plan: dict, price: float, now_ms: int | None = None):
     return None
 
 
-def confirm(plan: dict, ctx: dict) -> dict:
-    """Confirmation gate used when price reaches the trigger.
+def gate_reasons(plan: dict, ctx: dict, strict: bool = False) -> list[str]:
+    """The single gate used BOTH when arming and when price reaches the trigger.
 
-    Only removes trades; never invents a reason to enter. Reuses the same
-    measured context the deterministic engine already exposes (4h structure,
-    MTF alignment, regime policy, volume confirmation).
+    Before 2.2.0 the arming path checked only confidence/RR/confluence while
+    this gate ran at trigger time, so plans were systematically created in a
+    context that was guaranteed to reject them (production: 109 triggered,
+    0 confirmed, 109 "invalidated"). Only removes trades; never invents one.
+
+    `strict=True` (arming) additionally fails closed when the regime is
+    unknown or the policy module cannot be imported. `strict=False` preserves
+    the historical confirmation semantics for existing callers/tests.
     """
     reasons = []
     side = plan.get("side")
@@ -233,12 +249,21 @@ def confirm(plan: dict, ctx: dict) -> dict:
         reasons.append("成交量不确认")
     if overlap is not None and overlap >= 0.70:
         reasons.append("K 线重叠过高，无结构")
+    if strict and regime is None:
+        reasons.append("regime 未知，无法验证状态门禁")
     try:
         from .policy import allow
         if not allow(regime, side):
             reasons.append("实测门禁拒绝该状态/方向组合")
-    except Exception:
-        pass
+    except Exception as e:
+        if strict:
+            reasons.append("门禁模块不可用: %s" % type(e).__name__)
+    return reasons
+
+
+def confirm(plan: dict, ctx: dict) -> dict:
+    """Confirmation gate used when price reaches the trigger (shared rules)."""
+    reasons = gate_reasons(plan, ctx, strict=False)
     return {"ok": not reasons, "reasons": reasons}
 
 
@@ -249,6 +274,12 @@ def apply(plan: dict, event: dict) -> dict:
     typ = (event or {}).get("type")
     now = int((event or {}).get("ts") or time.time() * 1000)
     if event.get("to_status"):
+        # Never let a transition write a status outside the state machine:
+        # such a plan becomes invisible to open_plans()/active_plan() forever.
+        if event["to_status"] not in STATUSES:
+            raise ValueError("illegal plan status: %r" % event["to_status"])
+        if out.get("status") in ("closed", "void"):
+            raise ValueError("terminal plan cannot transition: %s" % out["status"])
         out["status"] = event["to_status"]
     out["updated_at"] = now
     out["version"] = int(out.get("version") or 1) + 1

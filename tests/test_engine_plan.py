@@ -21,6 +21,9 @@ def payload(direction="long", conf=62):
                 "stance": {"direction": direction, "confidence": conf,
                            "target": 108.0, "stop": 95.0, "reasons": ["trend"]},
                 "structure": {"state": "up", "levels": {"swing_low": 97.0}},
+                # Real payloads always carry a regime (analysis.analyze_interval).
+                # transition/long is one of the measured non-blocked cells.
+                "regime": {"regime": "transition"},
                 "primary_pattern": {"type": "H2", "target": 109.0},
             }
         },
@@ -47,6 +50,37 @@ class BuildPlanTest(unittest.TestCase):
     def test_low_confidence_returns_none(self):
         params = {"plan_min_confidence": 52}
         self.assertIsNone(build_plan("BTCUSDT", payload(conf=45), params, {}))
+
+    def test_gate_rejects_blocked_regime_before_arming(self):
+        """Regression: arming must use the same gate as confirmation.
+
+        Production used to arm 109 plans that the trigger-time gate always
+        rejected (0 confirmed). up/short is in policy.BLOCK.
+        """
+        params = {"plan_min_confidence": 52, "plan_min_rr": 1.5,
+                  "plan_ttl_h": 12, "plan_trigger_max_atr": 1.5,
+                  "stance_stop_atr": 1.5, "stance_target_atr": 3.0}
+        p = payload("short")
+        p["intervals"]["4h"]["regime"] = {"regime": "up"}
+        self.assertIsNone(build_plan("BTCUSDT", p, params, {}))
+
+    def test_near_trigger_does_not_fire_without_price_move(self):
+        """Regression for the 2.1.1 'market' bug (105/112 production plans).
+
+        A 0.15*ATR pullback is only 0.00075 away in relative terms; the old
+        trigger_mode() called that "market" and evaluate() fired on the next
+        tick with an unchanged price.
+        """
+        from nakedk import plans as planlib
+        price, atr = 100000.0, 500.0
+        trig = price - 0.15 * atr
+        p = planlib.build("BTCUSDT", "4h", "long", price=price, atr=atr,
+                          trigger=trig, stop=trig - 1.5 * atr,
+                          target1=trig + 3 * atr)
+        self.assertIsNotNone(p)
+        self.assertEqual(p["trigger_mode"], "below")
+        self.assertIsNone(planlib.evaluate(p, price, now_ms=p["created_at"] + 22_000))
+        self.assertIsNotNone(planlib.evaluate(p, trig - 1, now_ms=p["created_at"] + 22_000))
 
 
 if __name__ == "__main__":

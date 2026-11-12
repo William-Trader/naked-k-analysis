@@ -26,7 +26,7 @@ import os
 import threading
 import time
 
-from nakedk import analysis, llm, plans as planlib, symbol_params
+from nakedk import analysis, llm, plans as planlib, research_gate, symbol_params
 from nakedk.fetch import klines
 from nakedk.markets import meta
 
@@ -60,6 +60,10 @@ DEFAULTS = {
     "max_open_plans": 2,
     "level_proximity_atr": 0.35,
     "push_severity": ["confirmed", "tp1", "tp2", "stopped", "invalidated"],
+    # Previously absent from DEFAULTS, so load_settings() silently dropped
+    # them and push.py always used hard-coded 30 / 5.
+    "max_alert_age_min": 30,
+    "max_push_attempts": 5,
 }
 
 _LAST_ANALYSIS = {}
@@ -130,6 +134,26 @@ def _sanitise(s: dict) -> dict:
     else:
         s["quiet_hours"] = [23, 8]
     s["push_armed"] = bool(s.get("push_armed"))
+    # Reject wrong types instead of persisting them: a string "yes" was
+    # truthy for auto_trigger and a non-numeric level_proximity_atr silently
+    # disabled level_watch (TypeError swallowed by the loop's bare except).
+    for key in ("auto_analyze", "auto_trigger", "auto_push", "llm_annotate",
+                "llm_autotune", "push_armed"):
+        v = s.get(key)
+        s[key] = v if isinstance(v, bool) else bool(DEFAULTS[key])
+    try:
+        s["level_proximity_atr"] = max(0.05, min(3.0, float(s.get("level_proximity_atr"))))
+    except (TypeError, ValueError):
+        s["level_proximity_atr"] = DEFAULTS["level_proximity_atr"]
+    sev = s.get("push_severity")
+    allowed = {"confirmed", "tp1", "tp2", "stopped", "invalidated", "armed"}
+    s["push_severity"] = ([x for x in sev if isinstance(x, str) and x in allowed]
+                          if isinstance(sev, list) else list(DEFAULTS["push_severity"]))
+    for key, lo, hi in (("max_alert_age_min", 1, 1440), ("max_push_attempts", 1, 20)):
+        try:
+            s[key] = max(lo, min(hi, int(s.get(key))))
+        except (TypeError, ValueError):
+            s[key] = DEFAULTS[key]
     return s
 
 
@@ -212,13 +236,20 @@ def build_plan(symbol: str, payload: dict, params: dict, settings: dict,
         return None
     primary = (payload.get("intervals") or {}).get("4h") or \
         (payload.get("intervals") or {}).get((payload.get("interval_order") or ["4h"])[0]) or {}
-    price = primary.get("price") or payload.get("price")
+    # Optional, evidence-backed filter (NK_RESEARCH_GATE=1). Off by default.
+    if not research_gate.admit(primary)[0]:
+        return None
+    ref_price = primary.get("price") or payload.get("price")
+    # The 4h reference close can be hours old. Arm against the same 15m
+    # execution price the trigger loop uses, otherwise a "wait for pullback"
+    # trigger is often already crossed the moment the plan is created.
+    price = float(payload.get("last_price") or ref_price)
     atr = ((primary.get("features") or {}).get("atr"))
     st = primary.get("stance") or {}
     if not price or not atr or not st.get("target"):
         return None
     max_atr = float(params.get("plan_trigger_max_atr", 1.5))
-    trigger, mode = _choose_trigger(side, primary, float(price), float(atr), max_atr)
+    trigger, mode = _choose_trigger(side, primary, price, float(atr), max_atr)
     stop_atr = float(params.get("stance_stop_atr", 1.5))
     target_atr = float(params.get("stance_target_atr", 3.0))
     swing = (primary.get("structure") or {}).get("levels") or {}
@@ -257,21 +288,36 @@ def build_plan(symbol: str, payload: dict, params: dict, settings: dict,
                    ("4h 收盘突破 %.4f" % stop)
     p = planlib.build(
         symbol, primary.get("interval") or "4h", side,
-        price=float(price), atr=float(atr), trigger=trigger, stop=stop,
+        price=price, atr=float(atr), trigger=trigger, stop=stop,
         target1=target1, target2=target2, setup=setup,
         confidence=combined.get("confidence") or 50,
         grade=combined.get("grade") or "C", snapshot=snap,
         ttl_h=float(params.get("plan_ttl_h", 12)),
         params_version=int(payload.get("params_version") or 0),
         invalidation=invalidation, now_ms=now_ms,
-        min_rr=float(params.get("plan_min_rr", 1.5)))
+        min_rr=float(params.get("plan_min_rr", 1.5)),
+        trigger_mode_hint=mode)
     if not p:
+        return None
+    # B4: never arm a plan whose trigger is already satisfied by the current
+    # execution price (that used to fire on the very next 20s tick).
+    tm = p.get("trigger_mode")
+    t = float(p["trigger"])
+    if (tm == "below" and price <= t) or (tm == "above" and price >= t) \
+            or tm == "market":
+        return None
+    # B2: apply the SAME gate at arming time that refresh_plan applies on
+    # arrival. Before 2.2.0 this gate only ran after trigger, producing
+    # 109 triggered / 0 confirmed / 109 invalidated in production.
+    probe = {"side": side, "interval": p.get("interval")}
+    if planlib.gate_reasons(probe, _ctx_from(payload, probe), strict=True):
         return None
     score, parts = _confluence(side, combined, primary, payload, p.get("rr"))
     if score < float(params.get("plan_min_confluence", 40)):
         return None
     p["confluence"] = score
     p["confluence_parts"] = parts
+    p["reference_price"] = ref_price
     risk = float(params.get("plan_risk_pct", 0.5))
     stop_pct = abs(float(trigger) - float(stop)) / float(trigger) * 100 if trigger else 0
     p["risk_pct"] = risk
@@ -424,7 +470,9 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
     now = int(time.time() * 1000)
     if cand and not active:
         cooldown = int(s.get("plan_rearm_cooldown_min") or 240) * 60_000
-        if cooldown and store.recent_void_plan(db_path, symbol, cand["side"], now - cooldown):
+        # symbol-level cooling: side-scoped lookup let a direction flip bypass
+        # the 240min re-arm cooldown entirely (long void -> short armed).
+        if cooldown and store.recent_void_plan(db_path, symbol, None, now - cooldown):
             cand = None
     plan = active
     if cand:
@@ -460,6 +508,7 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
             eid = store.add_plan_event(db_path, plan, ev, planlib.event_key(plan, ev))
             if eid:
                 store.outbox_add(db_path, eid, "qq", _plan_text(plan, ev, payload), dedupe_min=int(s.get("push_dedupe_min") or 0))
+            store.record_plan_signal(db_path, plan)
     if plan:
         described = planlib.describe(plan)
         ev_type = {"armed": "armed", "triggered": "triggered",
@@ -488,7 +537,10 @@ def _ctx_from(payload: dict, plan: dict) -> dict:
     f = primary.get("features") or {}
     return {
         "structure_direction": (primary.get("structure") or {}).get("state"),
-        "htf_direction": ((payload.get("intervals") or {}).get("1d") or {}).get(
+        # `intervals` only contains the requested timeframes (15m/4h), so the
+        # old lookup always returned None and the HTF veto was dead code.
+        "htf_direction": (payload.get("context_1d") or {}).get("state")
+        or ((payload.get("intervals") or {}).get("1d") or {}).get(
             "structure", {}).get("state"),
         "mtf_alignment": (payload.get("mtf") or {}).get("alignment"),
         "regime": (primary.get("regime") or {}).get("regime")
@@ -541,6 +593,49 @@ def last_price(symbol: str) -> float | None:
         return None
 
 
+_CONFIRM_RETRIES: dict[int, int] = {}
+
+
+def _confirm_arrival(plan: dict, price, settings: dict, db_path: str,
+                     events: list) -> None:
+    """Re-run the confirmation gate with a bounded retry.
+
+    Before 2.2.0 a single exception in refresh_plan() was swallowed as a
+    `confirm_error` event and the plan stayed in `triggered` forever: that
+    state has no path to `confirmed` in plans.evaluate(), so TP logic never
+    ran. Three attempts, then fail closed with an auditable outcome.
+    """
+    pid = plan.get("id")
+    n = _CONFIRM_RETRIES.get(pid, 0)
+    if n >= 3:
+        now = int(time.time() * 1000)
+        ev = {"type": "invalidated", "price": price, "ts": now,
+              "reason": "确认重试耗尽", "to_status": "void",
+              "outcome": "confirm_failed"}
+        updated = planlib.apply(plan, ev)
+        updated = store.save_plan(db_path, updated)
+        eid = store.add_plan_event(db_path, updated, ev,
+                                   planlib.event_key(updated, ev))
+        if eid and "invalidated" in (settings.get("push_severity") or []):
+            store.outbox_add(db_path, eid, "qq", _plan_text(updated, ev),
+                             dedupe_min=int(settings.get("push_dedupe_min") or 0))
+        store.record_plan_signal(db_path, updated)
+        events.append(ev)
+        _CONFIRM_RETRIES.pop(pid, None)
+        return
+    try:
+        cp = refresh_plan(plan.get("symbol"), settings, db_path)
+        _CONFIRM_RETRIES.pop(pid, None)
+        if cp and cp.get("status") in ("closed", "void"):
+            store.record_plan_signal(db_path, cp)
+        events.append({"type": "confirm_result", "plan_id": pid,
+                       "status": (cp or {}).get("status")})
+    except Exception as e:
+        _CONFIRM_RETRIES[pid] = n + 1
+        events.append({"type": "confirm_error", "plan_id": pid,
+                       "attempt": n + 1, "error": str(e)[:160]})
+
+
 def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
     s = settings or load_settings()
     if not s.get("auto_trigger"):
@@ -557,6 +652,12 @@ def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
         price = prices.get(sym)
         if price is None:
             continue
+        if plan.get("status") == "triggered":
+            try:
+                _confirm_arrival(plan, price, s, db_path, events)
+            except Exception as e:
+                events.append({"type": "confirm_error", "error": str(e)[:160]})
+            continue
         ev = planlib.evaluate(plan, price)
         if not ev:
             continue
@@ -567,15 +668,8 @@ def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
             eid = store.add_plan_event(db_path, updated, ev,
                                        planlib.event_key(updated, ev))
             events.append(ev)
-            # "think on arrival": full re-analysis + confirmation gate
-            try:
-                confirm_plan = refresh_plan(sym, s, db_path)
-                if confirm_plan:
-                    events.append({"type": "confirm_result",
-                                   "status": confirm_plan.get("status"),
-                                   "plan_id": confirm_plan.get("id")})
-            except Exception as e:
-                events.append({"type": "confirm_error", "error": str(e)[:160]})
+            # "think on arrival": full re-analysis + shared confirmation gate.
+            _confirm_arrival(updated, price, s, db_path, events)
         else:
             updated = planlib.apply(plan, ev)
             updated = store.save_plan(db_path, updated)
@@ -587,6 +681,8 @@ def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
                          "void": "invalidated"}.get(ev["type"], ev["type"])
             if eid and push_type in (s.get("push_severity") or []):
                 store.outbox_add(db_path, eid, "qq", _plan_text(updated, ev), dedupe_min=int(s.get("push_dedupe_min") or 0))
+            if updated.get("status") in ("closed", "void"):
+                store.record_plan_signal(db_path, updated)
     if events and s.get("auto_push"):
         try:
             push.push_outbox(db_path, s)

@@ -54,7 +54,9 @@ def rsi(closes: Sequence[float], period: int = 14) -> float | None:
         ag = (ag * (period - 1) + gains[i]) / period
         al = (al * (period - 1) + losses[i]) / period
     if al == 0:
-        return 100.0
+        # A perfectly flat tape is neutral (RSI 50), not "extremely overbought".
+        # Returning 100 here used to inject a phantom bearish signal into stance.
+        return 50.0 if ag == 0 else 100.0
     return 100.0 - 100.0 / (1.0 + ag / al)
 
 
@@ -206,10 +208,17 @@ def pct_change(closes, bars: int) -> float:
     return 0.0 if prev == 0 else (_f(closes[-1]) / prev - 1.0) * 100.0
 
 
-def features_from_klines(k4) -> dict:
-    """Compute the 4h feature set from Binance kline rows."""
+def features_from_klines(k4, interval: str = "4h") -> dict:
+    """Compute the feature set from normalised kline rows.
+
+    `interval` only rescales the lookback windows for ret4h/ret24h/ret72h so
+    those fields keep their *time* meaning on non-4h bars. The default keeps
+    the historical 4h behaviour byte-for-byte (compatibility).
+    """
     if len(k4) < 60:
-        raise ValueError("need at least 60 4h candles")
+        raise ValueError("need at least 60 candles")
+    mult = {"1d": 1 / 6, "4h": 1.0, "1h": 6.0, "30m": 12.0,
+            "15m": 24.0}.get(interval, 1.0)
     highs = [_f(r[2]) for r in k4]
     lows = [_f(r[3]) for r in k4]
     closes = [_f(r[4]) for r in k4]
@@ -243,9 +252,9 @@ def features_from_klines(k4) -> dict:
         "r20_lo": lo20, "r20_hi": hi20, "pos20": p20,
         "r40_lo": lo40, "r40_hi": hi40, "pos40": p40,
         "swing_highs": sh, "swing_lows": sl, "swing_marks": marks,
-        "ret4h": pct_change(closes, 1),
-        "ret24h": pct_change(closes, 6),
-        "ret72h": pct_change(closes, 18),
+        "ret4h": pct_change(closes, max(1, round(1 * mult))),
+        "ret24h": pct_change(closes, max(1, round(6 * mult))),
+        "ret72h": pct_change(closes, max(1, round(18 * mult))),
         "trend": ("up" if e20 > e50 and price > e20 else
                   "down" if e20 < e50 and price < e20 else "mixed"),
     }

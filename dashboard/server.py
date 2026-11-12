@@ -38,6 +38,12 @@ DB = os.environ.get("BEAGLE_DB", os.path.join(_REPO_ROOT, "beagle.db"))
 DASH = os.path.dirname(os.path.abspath(__file__))
 TOKEN = os.environ.get("NK_DASH_TOKEN", "")
 PORT = int(os.environ.get("PORT", "8080"))
+# Safe-by-default: bind loopback. Set NK_DASH_HOST=0.0.0.0 (plus a token) to
+# expose the panel externally. Production used to listen on 0.0.0.0 with no
+# token at all, making every read/write API anonymous.
+HOST = os.environ.get("NK_DASH_HOST", "127.0.0.1")
+CORS_ORIGINS = [x.strip() for x in
+                os.environ.get("NK_DASH_CORS_ORIGINS", "").split(",") if x.strip()]
 CACHE_TTL = 45
 STALE_TTL = 600
 
@@ -165,7 +171,7 @@ def api_health():
     return {
         "ok": db_ok,
         "service": "naked-k-price-action-terminal",
-        "version": "2.1.0",
+        "version": "2.3.0",
         "as_of": int(time.time() * 1000),
         "db": DB,
         "plans": stats,
@@ -209,7 +215,10 @@ def api_overview(q):
             out[sym] = fut.result()
         except Exception as e:
             errors[sym] = str(e)[:200]
-    return {"as_of": int(time.time() * 1000), "settings": s,
+    # Return the settings actually in effect. The local `s` above only
+    # overrides `intervals` for this request but `_payload()` re-reads the
+    # file, so echoing it used to poison the frontend state.
+    return {"as_of": int(time.time() * 1000), "settings": engine.load_settings(),
             "symbols": out, "errors": errors}
 
 
@@ -231,7 +240,10 @@ def api_plans(q):
 
 
 def api_events(q):
-    limit = int((q.get("limit") or ["40"])[0])
+    try:
+        limit = max(1, min(200, int((q.get("limit") or ["40"])[0])))
+    except (TypeError, ValueError):
+        limit = 40
     return {"plan_events": store.plan_events(DB, None, min(200, limit)),
             "alerts": _legacy_alerts(limit)}
 
@@ -329,6 +341,8 @@ def api_llm_optimize(body):
 def api_settings(body=None):
     if body is None:
         return engine.load_settings()
+    if not isinstance(body, dict):
+        return {"error": "bad body"}
     s = engine.save_settings(body)
     _broadcast("settings", s)
     return s
@@ -374,7 +388,10 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Cache-Control", "no-store")
-        self.send_header("Access-Control-Allow-Origin", "*")
+        ao = self._cors_origin()
+        if ao:
+            self.send_header("Access-Control-Allow-Origin", ao)
+            self.send_header("Vary", "Origin")
         if gz:
             self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")
@@ -385,7 +402,21 @@ class Handler(BaseHTTPRequestHandler):
         except BrokenPipeError:
             pass
 
+    def _cors_origin(self):
+        """Whitelist-based CORS. Empty config = no cross-origin access."""
+        origin = self.headers.get("Origin")
+        if "*" in CORS_ORIGINS:
+            return "*"
+        return origin if origin and origin in CORS_ORIGINS else None
+
     def _authorized(self, q):
+        path = urlparse(self.path).path
+        # Static assets contain no data. Requiring a token on them made the
+        # panel white-screen as soon as NK_DASH_TOKEN was enabled, because
+        # index.html cannot propagate the query token to <link>/<script>.
+        if path == "/styles.css" or path.startswith("/app/") \
+                or path.startswith("/vendor/"):
+            return True
         if not TOKEN:
             return True
         if self.headers.get("Authorization", "") == "Bearer " + TOKEN:
@@ -402,9 +433,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        ao = self._cors_origin()
+        if ao:
+            self.send_header("Access-Control-Allow-Origin", ao)
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
 
     def do_GET(self):
@@ -449,8 +482,10 @@ class Handler(BaseHTTPRequestHandler):
         except BrokenPipeError:
             pass
         except Exception as e:
-            tb = traceback.format_exc(limit=4)
-            self._send({"error": str(e)[:300], "trace": tb[-800:]}, status=500)
+            # Never leak source paths / stack frames to anonymous callers.
+            sys.stderr.write("GET %s failed: %s\n%s" %
+                             (path, e, traceback.format_exc(limit=4)))
+            self._send({"error": "internal error"}, status=500)
 
     def do_POST(self):
         u = urlparse(self.path)
@@ -479,8 +514,14 @@ class Handler(BaseHTTPRequestHandler):
                 sym = (body.get("symbol") or "").strip().upper()
                 iv = (body.get("interval") or "").strip()
                 lines = body.get("lines") if isinstance(body.get("lines"), list) else []
-                if not sym:
-                    return self._send({"error": "symbol required"})
+                ok_chars = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+                               "0123456789_.:|-")
+                if not sym or len(sym) > 64 or any(c not in ok_chars for c in sym) \
+                        or len(iv) > 64 or any(c not in ok_chars for c in iv):
+                    return self._send({"error": "bad symbol/interval"})
+                # Bound persisted drawing payloads (disk DoS / key pollution).
+                lines = [x for x in lines[:2000]
+                         if len(json.dumps(x, ensure_ascii=False, default=str)) <= 20480]
                 key = sym + "|" + iv if iv else sym
                 path = os.path.join(_REPO_ROOT, "drawings.json")
                 try:
@@ -510,7 +551,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def _plan_action(self, body):
         """Manual control: void an armed plan (user override only)."""
-        pid = int(body.get("plan_id") or 0)
+        try:
+            pid = int(body.get("plan_id") or 0)
+        except (TypeError, ValueError):
+            return self._send({"error": "bad plan_id"})
         plan = store.get_plan(DB, pid)
         if not plan:
             return {"error": "plan not found"}
@@ -590,6 +634,12 @@ class Handler(BaseHTTPRequestHandler):
                 {"as_of": int(time.time() * 1000)})).encode())
             self.wfile.flush()
             while True:
+                # _broadcast() evicts a subscriber whose queue overflows;
+                # without this check the SSE thread wrote pings forever and
+                # leaked one thread per reconnect.
+                with _subs_lock:
+                    if qq not in _subs:
+                        break
                 try:
                     ev, data = qq.get(timeout=15)
                     chunk = "event: %s\ndata: %s\n\n" % (
@@ -652,10 +702,14 @@ class EngineThread(threading.Thread):
 
 
 def main():
+    if not TOKEN:
+        sys.stderr.write(
+            "WARNING: NK_DASH_TOKEN is empty - set one before exposing this "
+            "service; NK_DASH_HOST currently binds %s\n" % HOST)
     store.init(DB)
     EngineThread().start()
-    httpd = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    print("price-action terminal on http://127.0.0.1:%d  db=%s" % (PORT, DB))
+    httpd = ThreadingHTTPServer((HOST, PORT), Handler)
+    print("price-action terminal on http://%s:%d  db=%s" % (HOST, PORT, DB))
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
