@@ -24,8 +24,9 @@ DEFAULT_COST_BPS = 12.0
 def _binance_history(symbol: str, interval: str = "4h", days: int = 365):
     end = int(time.time() * 1000)
     start = end - days * 86_400_000
-    out, cursor = [], start
+    out, cursor, seen = [], start, set()
     step = BAR_MS[interval]
+    max_bars = days * (86_400_000 // step) + 10
     while cursor < end:
         rows = get_json(
             f"/api/v3/klines?symbol={symbol}&interval={interval}"
@@ -33,10 +34,21 @@ def _binance_history(symbol: str, interval: str = "4h", days: int = 365):
         )
         if not rows:
             break
-        out.extend(rows)
-        cursor = rows[-1][0] + step
-        if len(rows) < 1000:
+        fresh = 0
+        for r in rows:
+            t = int(r[0])
+            if t in seen:
+                continue
+            seen.add(t)
+            out.append(r)
+            fresh += 1
+        nxt = int(rows[-1][0]) + step
+        # Guard against a provider that ignores startTime and always returns
+        # the same page: previously this looped forever with unbounded memory.
+        if nxt <= cursor or fresh == 0 or len(rows) < 1000 or len(out) > max_bars:
             break
+        cursor = nxt
+    out.sort(key=lambda r: int(r[0]))
     return out
 
 
@@ -67,8 +79,25 @@ def _sharpe(returns: list):
     return None if sd == 0 else mu / sd
 
 
+_PATH_TS_CACHE: dict = {}
+
+
 def _path_slice(path_ks, start_ts: int, end_ts: int):
-    return [k for k in path_ks if start_ts < int(k[0]) <= end_ts]
+    """Bisect the (sorted) intrabar path instead of scanning it per trade.
+
+    The old linear scan dominated parameter-grid searches: one full 1h array
+    scan for every simulated trade. Semantics are identical.
+    """
+    import bisect
+    key = id(path_ks)
+    ts = _PATH_TS_CACHE.get(key)
+    if ts is None or len(ts) != len(path_ks):
+        ts = [int(k[0]) for k in path_ks]
+        _PATH_TS_CACHE.clear()
+        _PATH_TS_CACHE[key] = ts
+    lo = bisect.bisect_right(ts, start_ts)
+    hi = bisect.bisect_right(ts, end_ts)
+    return path_ks[lo:hi]
 
 
 def _passes_gate(f, s, gate):
@@ -84,12 +113,48 @@ def _passes_gate(f, s, gate):
         slope = f.get("adx_slope") or 0.0
         overlap = f.get("overlap") or 0.0
         return adx >= 20 and slope >= -1.0 and overlap < 0.65
+    # Gates below mirror the live 2.2.0 confirmation rules so research and
+    # production evaluate the same hypotheses (no backtest/production drift).
+    if gate == "v22":
+        adx = f.get("adx14") or 0.0
+        slope = f.get("adx_slope") or 0.0
+        overlap = f.get("overlap") or 0.0
+        vol_z = f.get("vol_z") or 0.0
+        return (adx >= 20 and slope >= -1.0 and overlap < 0.65
+                and vol_z >= -0.5)
+    if gate == "v22_strict":
+        adx = f.get("adx14") or 0.0
+        slope = f.get("adx_slope") or 0.0
+        overlap = f.get("overlap") or 0.0
+        vol_z = f.get("vol_z") or 0.0
+        return (adx >= 25 and slope >= 0 and overlap < 0.55
+                and vol_z >= 0.0)
+    if gate == "policy":
+        from .policy import allow
+        return allow(_regime_of(f), s.get("direction"))
+    if gate == "v22_policy":
+        from .policy import allow
+        return _passes_gate(f, s, "v22") and allow(_regime_of(f), s.get("direction"))
     return True
+
+
+def _regime_of(f: dict) -> str:
+    """Lightweight regime label from the same features the live engine sees."""
+    adx = f.get("adx14") or 0.0
+    slope = f.get("ema_slope") or 0.0
+    if adx < 20:
+        return "range"
+    if slope > 0.3:
+        return "up"
+    if slope < -0.3:
+        return "down"
+    return "transition"
 
 
 def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
               gate=None, tag_setups: bool = False, params=None, feats=None,
-              slippage_bps: float = 0.0, funding_bps: float = 0.0) -> list:
+              slippage_bps: float = 0.0, funding_bps: float = 0.0,
+              mask: dict | None = None) -> list:
     """Simulate the deterministic stance over a bar range.
 
     Cost model (all in basis points, 1 bp = 0.01%):
@@ -115,6 +180,15 @@ def _simulate(ks, lo: int, hi: int, horizon: int, cost_bps: float, path_ks=None,
             continue
         if not _passes_gate(f, s, gate):
             continue
+        if mask is not None:
+            # Adaptive multi-scale time/price-state engine (2.3.0). Purely
+            # subtractive and computed with data available at bar i only.
+            from . import spacetime
+            ok, _why = spacetime.admit(mask.get(int(ks[i][0])),
+                                       s["direction"],
+                                       horizon_h=4 * horizon)
+            if not ok:
+                continue
         entry = float(ks[i][4])
         if params:
             atr = f.get("atr14") or 0.0

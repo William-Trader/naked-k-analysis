@@ -1,0 +1,27 @@
+{
+  "base": "https://data-api.binance.vision",
+  "days": 730,
+  "files": {
+    "BTCUSDT_1h.json.gz": {
+      "bytes": 404837,
+      "rows": 17519,
+      "sha256": "832b3ee69fe343f59b591a929af4a10d25766eff502a0d338e57b41dff3ea865"
+    },
+    "BTCUSDT_4h.json.gz": {
+      "bytes": 106792,
+      "rows": 4379,
+      "sha256": "f8c53cbc89a9f4bccee73b4b34b2e3eacbfe28e6623439ae278c8ad67b6d7d9e"
+    },
+    "ETHUSDT_1h.json.gz": {
+      "bytes": 369915,
+      "rows": 17519,
+      "sha256": "5723be634b73edb28b10671b99798f8d28a408cb00b93429bf84a4c5999c7046"
+    },
+    "ETHUSDT_4h.json.gz": {
+      "bytes": 98424,
+      "rows": 4379,
+      "sha256": "dce3806ae39153fe24d68ddfce881ef926c16cb83c650a1faf5b6cbe9bccdb42"
+    }
+  },
+  "generated_at": 1794465023408
+}

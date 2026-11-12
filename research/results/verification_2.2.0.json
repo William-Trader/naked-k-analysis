@@ -1,0 +1,447 @@
+{
+  "candidate": {
+    "gate": "v22",
+    "name": "v22_p1.5_3.0_22",
+    "params": {
+      "adx_min": 22,
+      "stop_atr": 1.5,
+      "target_atr": 3.0
+    }
+  },
+  "data": {
+    "base": "https://data-api.binance.vision",
+    "days": 730,
+    "rows": {
+      "BTCUSDT_1h.json.gz": 17519,
+      "BTCUSDT_4h.json.gz": 4379,
+      "ETHUSDT_1h.json.gz": 17519,
+      "ETHUSDT_4h.json.gz": 4379
+    },
+    "sha256": "e8ea5905476ef45d"
+  },
+  "generated_at": 1794468189296,
+  "scenarios": [
+    {
+      "baseline": {
+        "avg_ret": -0.0125,
+        "folds": 4,
+        "hit_rate": 46.72,
+        "max_drawdown": -12.33,
+        "positive_folds": 2,
+        "robustness": 0.21281,
+        "sharpe_per_trade": -0.041,
+        "trades": 169,
+        "wilson_low": 29.9
+      },
+      "candidate": {
+        "avg_ret": 0.1162,
+        "folds": 4,
+        "hit_rate": 56.88,
+        "max_drawdown": -5.11,
+        "positive_folds": 3,
+        "robustness": 0.58537,
+        "sharpe_per_trade": 0.129,
+        "trades": 51,
+        "wilson_low": 31.4
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "reference (12bp, 2 symbols)",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.0525,
+        "folds": 4,
+        "hit_rate": 45.57,
+        "max_drawdown": -15.15,
+        "positive_folds": 2,
+        "robustness": 0.12508,
+        "sharpe_per_trade": -0.083,
+        "trades": 169,
+        "wilson_low": 28.8
+      },
+      "candidate": {
+        "avg_ret": 0.0762,
+        "folds": 4,
+        "hit_rate": 54.9,
+        "max_drawdown": -5.6,
+        "positive_folds": 3,
+        "robustness": 0.51759,
+        "sharpe_per_trade": 0.085,
+        "trades": 51,
+        "wilson_low": 31.4
+      },
+      "candidate_wins": true,
+      "cost_bps": 16,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "cost 16bp",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.0925,
+        "folds": 4,
+        "hit_rate": 43.76,
+        "max_drawdown": -17.96,
+        "positive_folds": 1,
+        "robustness": -0.04506,
+        "sharpe_per_trade": -0.126,
+        "trades": 169,
+        "wilson_low": 26.7
+      },
+      "candidate": {
+        "avg_ret": 0.0362,
+        "folds": 4,
+        "hit_rate": 52.91,
+        "max_drawdown": -6.09,
+        "positive_folds": 3,
+        "robustness": 0.43781,
+        "sharpe_per_trade": 0.04,
+        "trades": 51,
+        "wilson_low": 28.4
+      },
+      "candidate_wins": true,
+      "cost_bps": 20,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "cost 20bp",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.1425,
+        "folds": 4,
+        "hit_rate": 40.85,
+        "max_drawdown": -21.35,
+        "positive_folds": 1,
+        "robustness": -0.13382,
+        "sharpe_per_trade": -0.178,
+        "trades": 169,
+        "wilson_low": 23.6
+      },
+      "candidate": {
+        "avg_ret": -0.0138,
+        "folds": 4,
+        "hit_rate": 50.98,
+        "max_drawdown": -6.7,
+        "positive_folds": 2,
+        "robustness": 0.24582,
+        "sharpe_per_trade": -0.016,
+        "trades": 51,
+        "wilson_low": 25.5
+      },
+      "candidate_wins": true,
+      "cost_bps": 25,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "cost 25bp",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.149,
+        "folds": 2,
+        "hit_rate": 39.5,
+        "max_drawdown": -12.33,
+        "positive_folds": 0,
+        "robustness": -0.18953,
+        "sharpe_per_trade": -0.19,
+        "trades": 86,
+        "wilson_low": 29.9
+      },
+      "candidate": {
+        "avg_ret": -0.071,
+        "folds": 2,
+        "hit_rate": 48.3,
+        "max_drawdown": -5.11,
+        "positive_folds": 1,
+        "robustness": 0.12522,
+        "sharpe_per_trade": -0.091,
+        "trades": 29,
+        "wilson_low": 31.4
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "BTCUSDT only",
+      "symbols": [
+        "BTCUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": 0.129,
+        "folds": 2,
+        "hit_rate": 54.2,
+        "max_drawdown": -6.12,
+        "positive_folds": 2,
+        "robustness": 0.68014,
+        "sharpe_per_trade": 0.108,
+        "trades": 83,
+        "wilson_low": 43.5
+      },
+      "candidate": {
+        "avg_ret": 0.363,
+        "folds": 2,
+        "hit_rate": 68.2,
+        "max_drawdown": -2.3,
+        "positive_folds": 2,
+        "robustness": 0.75628,
+        "sharpe_per_trade": 0.349,
+        "trades": 22,
+        "wilson_low": 47.3
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "ETHUSDT only",
+      "symbols": [
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.0493,
+        "folds": 4,
+        "hit_rate": 42.47,
+        "max_drawdown": -6.3,
+        "positive_folds": 1,
+        "robustness": 0.06873,
+        "sharpe_per_trade": -0.083,
+        "trades": 73,
+        "wilson_low": 20.8
+      },
+      "candidate": {
+        "avg_ret": 0.2272,
+        "folds": 4,
+        "hit_rate": 62.94,
+        "max_drawdown": -2.3,
+        "positive_folds": 4,
+        "robustness": 0.76444,
+        "sharpe_per_trade": 0.261,
+        "trades": 27,
+        "wilson_low": 30.1
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        3829
+      ],
+      "scenario": "test first half",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": 0.0154,
+        "folds": 4,
+        "hit_rate": 49.99,
+        "max_drawdown": -10.2,
+        "positive_folds": 2,
+        "robustness": 0.28325,
+        "sharpe_per_trade": -0.001,
+        "trades": 96,
+        "wilson_low": 30.5
+      },
+      "candidate": {
+        "avg_ret": -0.0093,
+        "folds": 4,
+        "hit_rate": 50.02,
+        "max_drawdown": -5.03,
+        "positive_folds": 1,
+        "robustness": 0.07183,
+        "sharpe_per_trade": -0.008,
+        "trades": 24,
+        "wilson_low": 21.4
+      },
+      "candidate_wins": false,
+      "cost_bps": 12.0,
+      "range": [
+        3829,
+        4377
+      ],
+      "scenario": "test second half",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.0125,
+        "folds": 4,
+        "hit_rate": 46.72,
+        "max_drawdown": -12.33,
+        "positive_folds": 2,
+        "robustness": 0.21281,
+        "sharpe_per_trade": -0.041,
+        "trades": 169,
+        "wilson_low": 29.9
+      },
+      "candidate": {
+        "avg_ret": 0.1714,
+        "folds": 4,
+        "hit_rate": 58.18,
+        "max_drawdown": -4.99,
+        "positive_folds": 3,
+        "robustness": 0.64289,
+        "sharpe_per_trade": 0.152,
+        "trades": 55,
+        "wilson_low": 33.2
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "neighbour adx_min=20",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.0125,
+        "folds": 4,
+        "hit_rate": 46.72,
+        "max_drawdown": -12.33,
+        "positive_folds": 2,
+        "robustness": 0.21281,
+        "sharpe_per_trade": -0.041,
+        "trades": 169,
+        "wilson_low": 29.9
+      },
+      "candidate": {
+        "avg_ret": 0.1045,
+        "folds": 4,
+        "hit_rate": 57.46,
+        "max_drawdown": -5.32,
+        "positive_folds": 3,
+        "robustness": 0.55543,
+        "sharpe_per_trade": 0.1,
+        "trades": 47,
+        "wilson_low": 30.0
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "neighbour adx_min=24",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.0125,
+        "folds": 4,
+        "hit_rate": 46.72,
+        "max_drawdown": -12.33,
+        "positive_folds": 2,
+        "robustness": 0.21281,
+        "sharpe_per_trade": -0.041,
+        "trades": 169,
+        "wilson_low": 29.9
+      },
+      "candidate": {
+        "avg_ret": 0.127,
+        "folds": 4,
+        "hit_rate": 56.88,
+        "max_drawdown": -4.81,
+        "positive_folds": 3,
+        "robustness": 0.60159,
+        "sharpe_per_trade": 0.139,
+        "trades": 51,
+        "wilson_low": 31.4
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "neighbour stop_atr=1.25",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    },
+    {
+      "baseline": {
+        "avg_ret": -0.0125,
+        "folds": 4,
+        "hit_rate": 46.72,
+        "max_drawdown": -12.33,
+        "positive_folds": 2,
+        "robustness": 0.21281,
+        "sharpe_per_trade": -0.041,
+        "trades": 169,
+        "wilson_low": 29.9
+      },
+      "candidate": {
+        "avg_ret": 0.1196,
+        "folds": 4,
+        "hit_rate": 56.88,
+        "max_drawdown": -5.41,
+        "positive_folds": 3,
+        "robustness": 0.58945,
+        "sharpe_per_trade": 0.133,
+        "trades": 51,
+        "wilson_low": 31.4
+      },
+      "candidate_wins": true,
+      "cost_bps": 12.0,
+      "range": [
+        3282,
+        4377
+      ],
+      "scenario": "neighbour stop_atr=1.75",
+      "symbols": [
+        "BTCUSDT",
+        "ETHUSDT"
+      ]
+    }
+  ],
+  "total": 12,
+  "verdict": "robust across perturbations",
+  "win_count": 11,
+  "win_rate": 91.7
+}

@@ -21,3 +21,17 @@ config/llm.local.json
 
 # user drawings (runtime state)
 drawings.json
+
+# 通用密钥 / 本地环境 / 私钥（避免误提交真实凭据）
+*.key
+.env
+.env.*
+*.pem
+id_rsa*
+
+# .DS_Store 已在文件开头忽略（macOS 元数据）
+
+# 回测冻结快照需入库：覆盖上面的 data/ 规则，放行 research/data 目录及其快照文件
+!research/data/
+!research/data/*.json.gz
+!research/data/manifest.json
