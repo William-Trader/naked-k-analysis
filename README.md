@@ -4,10 +4,10 @@
 
 [![ci](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/William-Trader/naked-k-analysis/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![version](https://img.shields.io/badge/version-2.1.0-blue.svg)](CHANGELOG.md)
+[![version](https://img.shields.io/badge/version-2.3.0-blue.svg)](CHANGELOG.md)
 [![dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)](#工程约束)
 [![License: Personal Use & Group Exchange](https://img.shields.io/badge/License-Personal%20Use%20%26%20Group%20Exchange-blue.svg)](LICENSE)
-[![Watermarked](https://img.shields.io/badge/code-watermarked%20(NKA)-orange.svg)](WATERMARK.md)
+[![Watermarks (partial)](https://img.shields.io/badge/code-watermarks-partial%20(NKA)-orange.svg)](WATERMARK.md)
 
 > **许可 / License**: [Personal Use & Group Exchange License](LICENSE).
 > **仅供个人使用与团体交流；禁止商业用途。**
@@ -225,6 +225,34 @@ python3 -m unittest discover -s tests
 
 ---
 
+## 研究与回测
+
+历史行情与回测可复现，冻结快照纳入版本库以便任何人基于同一份数据复核：
+
+```bash
+# 冻结历史行情快照（写入 research/data/，快照入库）
+python3 research/fetch_history.py
+
+# 查看回测参数并运行 walk-forward 验证
+python3 research/run_backtest.py --help
+```
+
+- `research/data/*.json.gz` 与 `research/data/manifest.json` 作为冻结快照入库（`.gitignore` 已放行），保证结论可复现。
+
+```bash
+PYTHONPATH=. python3 research/run_backtest.py      # 三段式 walk-forward 选参
+PYTHONPATH=. python3 research/verify_result.py     # 12 组样本外扰动压力验证
+PYTHONPATH=. python3 research/run_spacetime.py     # 自适应时空体系对比
+```
+
+**2.2.0 样本外结论**（730 天冻结数据、BTCUSDT+ETHUSDT、4h、12bp 成本、test 段只评估一次）：baseline 169 笔、平均净 −0.0125%、命中 46.72%、最大回撤 −12.33%；采纳的 `v22` 门禁 + 参数为 51 笔、+0.1162%、56.88%、−5.11%。12 组扰动场景胜 11 组。可通过 `NK_RESEARCH_GATE=1` 启用（默认关闭）。
+
+**2.3.0 时空体系**：[docs/SPACETIME.md](docs/SPACETIME.md) 描述自适应尺度轴与价格结构状态；`NK_SPACETIME=1` 开启描述性分析字段（默认关闭、不参与门禁）。其规则在验证中未超过 2.2.0 champion，且 test 段被复用过，因此**未采纳为交易门禁**。
+
+本页与所有研究脚本**不承诺正期望、不宣称「行业最优」**；所有数字均可从冻结快照复现，结论口径见 [docs/BACKTEST.md](docs/BACKTEST.md)、[docs/SPACETIME.md](docs/SPACETIME.md) 与 CHANGELOG。
+
+---
+
 ## 工程约束
 
 1. **零第三方依赖**：Python 标准库 + SQLite；图表库本地 vendor（Apache 2.0，见 `NOTICE.md`）。
@@ -232,7 +260,8 @@ python3 -m unittest discover -s tests
 3. **单一计划事实源**：前端与 QQ 都读同一个 plan / plan_event，避免「群里说 A、页面说 B」。
 4. **幂等**：`plan_events.idempotency_key` + `outbox(plan_event_id, channel)` 唯一约束。
 5. **门禁只做减法**：新增过滤必须有实测依据；不因「看起来更好」而放宽。
-6. **测试只增不减**：237 个单测通过；新增模块带纯函数测试。
+6. **测试只增不减**：259 个单测通过；新增模块带纯函数测试，后续新增回归测试会继续增加该数字。
+7. **安全默认值**：dashboard 默认只绑 `127.0.0.1`，对外暴露需显式设置 `NK_DASH_HOST` 与 `NK_DASH_TOKEN`。
 
 ---
 
@@ -245,4 +274,4 @@ python3 -m unittest discover -s tests
 ## License
 
 [Personal Use & Group Exchange License](LICENSE)。仅供个人使用与团体交流；禁止商业用途。
-所有核心源文件带 `WM: NKA-XXXXXXXX` 水印，清单见 [WATERMARK.md](WATERMARK.md)。
+水印（`WM: NKA-XXXXXXXX`）是部分核心文件的来源标记，并非覆盖全部源文件；已标记文件清单见 [WATERMARK.md](WATERMARK.md)。新增文件改用 SPDX 头。

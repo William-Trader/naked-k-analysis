@@ -4,6 +4,8 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-WorkingDirectory=/home/ubuntu/beagle-app
-Environment=PYTHONPATH=/home/ubuntu/nakedk-dashboard:/home/ubuntu/beagle-app
-ExecStart=/usr/bin/python3 -m beagle score --config /home/ubuntu/beagle-app/config/beagle.json
+User=root
+WorkingDirectory=/opt/apps/nakedk-dashboard
+Environment=PYTHONPATH=/opt/apps/nakedk-dashboard:/opt/apps/beagle-app
+Environment=BEAGLE_DB=/opt/apps/nakedk-dashboard/beagle.db
+ExecStart=/usr/bin/python3 -m beagle score --config /opt/apps/nakedk-dashboard/config/beagle.json

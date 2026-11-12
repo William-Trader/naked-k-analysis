@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: LicenseRef-NKA-Personal-1.0
+# 构建上下文排除：密钥 / 运行时状态 / 本地数据库 / 本地配置一律不进入镜像。
+# 路径约定见 deploy/INVENTORY.md。
+.git
+state/
+*.db
+*.key
+.env*
+config/*.local.json
+__pycache__
+**/__pycache__
+*.pyc

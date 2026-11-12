@@ -1,3 +1,5 @@
+# 2.1.1 起停用，勿 enable（旧推送桥）。
+# 保留文件仅供追溯/回滚；禁止 systemctl enable --now。见 deploy/INVENTORY.md。
 [Unit]
 Description=Beagle alert push bridge
 After=network-online.target

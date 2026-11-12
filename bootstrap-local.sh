@@ -19,7 +19,17 @@ echo "[1/5] Python check"
 
 echo "[2/5] Copy files to $APP_DIR"
 mkdir -p "$APP_DIR"
-rsync -a --exclude .git --exclude __pycache__ --exclude beagle.db --exclude .beagle.env ./ "$APP_DIR/"
+rsync -a \
+  --exclude '.git/' \
+  --exclude '__pycache__/' \
+  --exclude '*.pyc' \
+  --exclude 'state/' \
+  --exclude '*.db' \
+  --exclude '*.key' \
+  --exclude '.env*' \
+  --exclude '.beagle.env' \
+  --exclude 'config/*.local.json' \
+  ./ "$APP_DIR/"
 
 echo "[3/5] Unit tests"
 (cd "$APP_DIR" && "$PY" -m unittest discover -s tests)
@@ -29,10 +39,8 @@ if [ ! -f "$APP_DIR/.beagle.env" ]; then
   cp "$APP_DIR/config/beagle.env.example" "$APP_DIR/.beagle.env"
 fi
 chmod 600 "$APP_DIR/.beagle.env"
-# Default the local config to crypto majors only (realtime universe).
-if [ ! -f "$APP_DIR/config/beagle.json" ]; then
-  cp "$APP_DIR/config/beagle.json" "$APP_DIR/config/beagle.json"
-fi
+# config/beagle.json 已由上面的 rsync 一并同步到 $APP_DIR；
+# 原「cp 同一文件到同一文件」的自复制分支为无效代码，已移除。
 
 echo "[5/5] Run locally"
 if command -v launchctl >/dev/null 2>&1 && [ "$(uname -s)" = "Darwin" ]; then

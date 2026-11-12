@@ -1,3 +1,5 @@
+# 2.1.1 起停用，勿 enable：旧 1m/5m 事件监控链路，已由计划生命周期取代。
+# 保留文件仅供追溯/回滚；禁止 systemctl enable --now。见 deploy/INVENTORY.md。
 [Unit]
 Description=Beagle price-action market monitor
 After=network-online.target

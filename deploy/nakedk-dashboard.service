@@ -5,11 +5,21 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/opt/naked-k-analysis/nakedk-dashboard
-Environment=PORT=8080
-Environment=PYTHONPATH=/opt/naked-k-analysis/nakedk-dashboard
-Environment=BEAGLE_DB=/opt/naked-k-analysis/beagle-app/beagle.db
+User=root
+WorkingDirectory=/opt/apps/nakedk-dashboard
+Environment=PORT=8081
+Environment=PYTHONPATH=/opt/apps/nakedk-dashboard
+Environment=BEAGLE_DB=/opt/apps/nakedk-dashboard/beagle.db
+Environment=NK_SETTINGS=/opt/apps/nakedk-dashboard/state/settings.json
+Environment=NK_SYMBOL_PROFILES=/opt/apps/nakedk-dashboard/state/symbol_profiles.json
+Environment=NK_LLM_KEY_FILE=/opt/apps/nakedk-dashboard/state/llm.key
+Environment=NK_LLM_CONFIG=/opt/apps/nakedk-dashboard/config/llm.local.json
+# --- 可选安全/网络配置（按需取消注释并显式设置；切勿在此写入任何真实密钥或 token）---
+# 默认只绑定 127.0.0.1；如需对外暴露，必须同时设置 NK_DASH_HOST 与 NK_DASH_TOKEN。
+# Environment=NK_DASH_HOST=127.0.0.1     # 监听地址，默认 127.0.0.1
+# Environment=NK_DASH_TOKEN=             # Bearer/查询 token，留空=不鉴权（仅限本机）
+# Environment=NK_DASH_CORS_ORIGINS=      # 允许的来源，逗号分隔；留空=不放行跨域
+# 生产密钥请通过受控的 EnvironmentFile= 或密钥管理注入，不要写进本模板。
 ExecStart=/usr/bin/python3 dashboard/server.py
 Restart=always
 RestartSec=5

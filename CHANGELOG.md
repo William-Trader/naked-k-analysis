@@ -1,5 +1,53 @@
 # Changelog
 
+## 2.3.0 — 2026-11-12
+
+新增**自适应时空分析体系**（`nakedk/spacetime.py`），不推倒、不替换现有分析链路。
+
+### 新增
+- 时间轴：从 1h 基础序列重聚合 1h/2h/4h/8h/1d，用「净位移/总路程」选 `dominant_scale`；**不再先验固定 15m 为执行框架**。
+- 空间轴：40 根摆动区间分位、ATR 归一化速度/加速度、关键位触碰的时间衰减权重、UTC 时段、离散 `state_id`。
+- 可解释性：`describe()` 一行中文结论；面板新增「时空状态」卡片，逐项展示尺度效率与状态。
+- `build_state()` 在 4h bar 收盘时刻截断 1h 序列，**无未来函数**；`build_mask()` 支持历史重放。
+- 可选开关 `NK_SPACETIME=1`（默认关闭、零额外请求）；payload 新增描述性 `spacetime` 字段。
+
+### 验证与结论（不粉饰）
+- 同一冻结快照、同一三段分割：v1 规则只产生 4 笔训练交易（样本不足）；修正「长尺度主导被误拒」的逻辑反转后 v2 达 87/26/46 笔。
+- v2 在 validation 净 +0.1830%，但 test 转负 −0.1565%，**未超过 2.2.0 的 v22 champion（test +0.1162%）**。
+- 更关键：v2 规则是在看过 v1 test 之后修改的，test 段已被使用两次，**不再构成干净的样本外验证**。继续按它调规则属于数据窥探。
+- 因此时空体系**不晋升为交易门禁**，定位为描述性分析层；门禁仍以 v22 champion 为准（其 test 仅评估一次）。晋升需全新独立数据段做一次性验证。详见 [docs/SPACETIME.md](docs/SPACETIME.md) 与 `research/results/spacetime_2.3.0.json`。
+
+### 兼容性
+- 纯新增模块 + 可选环境变量；默认行为、API 响应结构（新增可空字段除外）、数据库 schema 均不变。
+- 新增 `tests/test_spacetime.py` 覆盖无未来函数、尺度自适应、规则可解释性。
+
+## 2.2.0 — 2026-11-12
+
+工程化与生产 101 对齐，补齐代码级缺陷修复，并建立**冻结快照 + 三段式 walk-forward + 样本外压力验证**的可复现研究闭环。
+
+### 修复
+- 确认门与建计划门禁统一，消除两套口径不一致。
+- trigger mode 在调用链中的传递修复。
+- rearm 冷却按 symbol 维度生效。
+- 两个 SQLite 数据孤岛统一：dashboard 与 beagle record/score/review 统一 `WorkingDirectory=/opt/apps/nakedk-dashboard`、显式 `BEAGLE_DB=/opt/apps/nakedk-dashboard/beagle.db`，老链路相对 `db_path` 由 `config/` 侧改动配合修正；路径以 [deploy/INVENTORY.md](deploy/INVENTORY.md) 为准。
+- outbox 重试与幂等增强（重试去重、唯一约束）。
+- dashboard 安全默认值（默认只绑 `127.0.0.1`，对外暴露需 `NK_DASH_HOST` + `NK_DASH_TOKEN`）与面板 XSS 修复。
+- 配置强类型化（读取时校验类型，减少隐式字符串 / None）。
+- systemd 模板与生产对齐（`/opt/apps/nakedk-dashboard`、`PORT=8081`、`User=root`），停用 unit 明确标注；`bootstrap.sh` 移除 `--delete-excluded`、排除 `state/` / 密钥 / `*.db`、发布前备份 `beagle.db` 并支持 `--dry-run`。
+
+### 研究（实测数字，均可复现）
+- 冻结快照：`python3 research/fetch_history.py` 把 BTCUSDT/ETHUSDT 730 天的 4h+1h 行情写入 `research/data/*.json.gz`（含 sha256 manifest，入库）。
+- 方法：train 50% / validation 25% / **test 25%（只评估一次）**，每段 4-fold walk-forward，12bp 往返成本，样本量 <30 不得参选，validation 连续 2 轮无改善即早停；`python3 research/run_backtest.py`。
+- 样本外结果（test）：baseline 169 笔 / 平均净 −0.0125% / 命中 46.72% / 最大回撤 −12.33%；采纳 `v22` 门禁 + `adx_min=22, stop=1.5ATR, target=3ATR` 后 **51 笔 / +0.1162% / 56.88% / −5.11%**（净收益 +0.1287pp、命中 +10.16pp、回撤改善 7.22pp、交易数 −118）。
+- 压力验证 `python3 research/verify_result.py`：成本 12/16/20/25bp、单标的、test 前后半段、参数邻域共 **12 组场景胜 11 组（91.7%）**，唯一失败为 test 后半段；结果见 `research/results/verification_2.2.0.json`。
+- 落地方式：`NK_RESEARCH_GATE=1` 可选启用（`nakedk/research_gate.py`），**默认关闭**以保持兼容；历史模拟不构成正期望声明。
+- 单测由 259 增至 **294 全绿**（+2 门禁对称性用例、+22 项审计回归、+11 项时空引擎用例；含 2.3.0 新增部分）。
+
+### 兼容性
+- 所有部署侧新行为都有环境变量开关或为纯文档 / 忽略规则，不删除既有功能。
+- 生产目录不是 git 仓库，继续采用文件级覆盖同步；**发布前先备份 `beagle.db`**。
+- 生产路径以 [deploy/INVENTORY.md](deploy/INVENTORY.md) 为唯一权威清单；`docs/ARCHITECTURE.md` 降级为 v2 时代历史文档。
+
 ## 2.1.1 — 2026-11-09
 
 QQ 重复推送修复。

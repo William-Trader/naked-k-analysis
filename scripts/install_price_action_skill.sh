@@ -12,8 +12,17 @@ fi
 mkdir -p "$DEST_DIR"
 cp -f "$SRC" "$DEST_DIR/SKILL.md"
 
-AG="$OC_HOME/workspace/AGENTS.md"
-if [ -f "$AG" ] && ! grep -q "price-action-analyst" "$AG"; then
+AG_DIR="$OC_HOME/workspace"
+AG="$AG_DIR/AGENTS.md"
+# 幂等：以段落标题作为固定字符串标记，已存在则不再追加。
+# 同时确保 workspace/AGENTS.md 存在——原逻辑以 [ -f "$AG" ] 为前提，
+# 文件不存在时会静默跳过，导致指针段落永远丢失。
+MARKER="## 价格行为系统"
+mkdir -p "$AG_DIR"
+if [ ! -f "$AG" ]; then
+  : > "$AG"
+fi
+if ! grep -qF "$MARKER" "$AG"; then
   {
     echo ""
     echo "## 价格行为系统"

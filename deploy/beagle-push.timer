@@ -1,3 +1,5 @@
+# 2.1.1 起停用，勿 enable（随 beagle-push.service 一并停用）。
+# 保留文件仅供追溯/回滚；禁止 systemctl enable --now。见 deploy/INVENTORY.md。
 [Unit]
 Description=Run beagle push every 5 minutes
 

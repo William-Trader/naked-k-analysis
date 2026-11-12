@@ -1,8 +1,11 @@
 # WATERMARK registry - naked-k-analysis
 
-> Every core module carries an embedded watermark banner (WM: NKA-XXXXXXXX).
+> Watermark banners (`WM: NKA-XXXXXXXX`) are **source-origin marks on a subset of core files**, not on every module.
+> A number of `.py` source files carry no WM banner; the exact list of marked files is the registry below (26 files).
 > ID = NKA- + first 8 hex of sha1(naked-k-analysis|William-Trader + | + relpath).
-> Removing the banner violates the Personal Use & Group Exchange License. Watermark = traceability, not copy-prevention.
+> Removing a banner violates the Personal Use & Group Exchange License. Watermark = traceability, not copy-prevention.
+> Files added from 2.2.0 onward (e.g. `deploy/INVENTORY.md`, `.dockerignore`) carry an
+> `SPDX-License-Identifier: LicenseRef-NKA-Personal-1.0` header instead of a WM banner.
 
 | File | WM ID |
 |---|---|
