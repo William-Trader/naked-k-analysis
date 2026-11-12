@@ -124,6 +124,18 @@ CREATE TABLE IF NOT EXISTS outbox (
 );
 CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status, id);
 
+CREATE TABLE IF NOT EXISTS market_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts INTEGER NOT NULL,
+  symbol TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  old_value TEXT,
+  new_value TEXT,
+  detail TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_market_events_symbol_ts ON market_events(symbol, ts);
+
 CREATE TABLE IF NOT EXISTS state (
   symbol TEXT PRIMARY KEY,
   state TEXT,
@@ -180,6 +192,7 @@ def init(path: str) -> None:
         for col, ddl in (
             ("last_error", "ALTER TABLE outbox ADD COLUMN last_error TEXT"),
             ("next_attempt_at", "ALTER TABLE outbox ADD COLUMN next_attempt_at INTEGER DEFAULT 0"),
+            ("urgent", "ALTER TABLE outbox ADD COLUMN urgent INTEGER DEFAULT 0"),
         ):
             if col not in bcols:
                 conn.execute(ddl)
@@ -588,7 +601,7 @@ def plan_stats(path: str, symbol: str | None = None) -> dict:
 
 
 def outbox_add(path: str, plan_event_id: int, channel: str, text: str,
-               dedupe_min: int = 0):
+               dedupe_min: int = 0, urgent: int = 0):
     """Insert a pending message; optionally suppress identical text recently sent.
 
     plan_event_id uniqueness prevents replay of the *same* event. Content
@@ -607,8 +620,8 @@ def outbox_add(path: str, plan_event_id: int, channel: str, text: str,
                 return None
         cur = conn.execute(
             "INSERT OR IGNORE INTO outbox(plan_event_id,channel,text,status,attempts,"
-            "created_at) VALUES(?,?,?,'pending',0,?)",
-            (plan_event_id, channel, text, _now()))
+            "created_at,urgent) VALUES(?,?,?,'pending',0,?,?)",
+            (plan_event_id, channel, text, _now(), int(bool(urgent))))
         conn.commit()
         return cur.lastrowid if cur.rowcount else None
     finally:
@@ -689,5 +702,46 @@ def record_plan_signal(path: str, plan: dict) -> int | None:
         conn.commit()
         row = conn.execute("SELECT id FROM signals WHERE plan_id=?", (pid,)).fetchone()
         return row["id"] if row else None
+    finally:
+        conn.close()
+
+
+def add_market_event(path: str, symbol: str, kind: str, old_value: str,
+                     new_value: str, ts: int, detail: str = "") -> int | None:
+    """Append a market state transition (trend / structure / regime / MTF)."""
+    conn = connect(path)
+    try:
+        cur = conn.execute(
+            "INSERT INTO market_events (ts,symbol,kind,old_value,new_value,detail,"
+            "created_at) VALUES (?,?,?,?,?,?,?)",
+            (int(ts), symbol, kind, str(old_value)[:400], str(new_value)[:400],
+             str(detail)[:500], _now()))
+        conn.commit()
+        return cur.lastrowid
+    finally:
+        conn.close()
+
+
+def recent_market_event(path: str, symbol: str, kind: str, old_value: str,
+                        new_value: str, since_ms: int) -> bool:
+    conn = connect(path)
+    try:
+        return conn.execute(
+            "SELECT 1 FROM market_events WHERE symbol=? AND kind=? AND "
+            "old_value=? AND new_value=? AND created_at>=? LIMIT 1",
+            (symbol, kind, str(old_value)[:400], str(new_value)[:400],
+             since_ms)).fetchone() is not None
+    finally:
+        conn.close()
+
+
+def latest_market_state(path: str, symbol: str) -> str | None:
+    """Last recorded state signature, so a restart does not re-notify."""
+    conn = connect(path)
+    try:
+        row = conn.execute(
+            "SELECT new_value FROM market_events WHERE symbol=? ORDER BY id DESC "
+            "LIMIT 1", (symbol,)).fetchone()
+        return row["new_value"] if row else None
     finally:
         conn.close()

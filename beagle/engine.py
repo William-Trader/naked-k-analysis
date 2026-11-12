@@ -59,12 +59,20 @@ DEFAULTS = {
     "trigger_seconds": 20,
     "max_open_plans": 2,
     "level_proximity_atr": 0.35,
-    "push_severity": ["confirmed", "tp1", "tp2", "stopped", "invalidated"],
+    # Every observable lifecycle transition goes to the ONE configured group.
+    # "armed" is additionally gated by push_armed to avoid double-send.
+    "push_severity": ["triggered", "confirmed", "tp1", "tp2", "stopped",
+                      "invalidated", "expired", "state_change"],
+    "push_state_change": True,          # trend / structure / regime switches
+    "state_change_cooldown_min": 60,    # identical switch is not re-pushed
     # Previously absent from DEFAULTS, so load_settings() silently dropped
     # them and push.py always used hard-coded 30 / 5.
     "max_alert_age_min": 30,
     "max_push_attempts": 5,
 }
+
+PUSH_EVENTS = {"armed", "triggered", "confirmed", "tp1", "tp2", "stopped",
+               "invalidated", "expired", "state_change", "confirm_error"}
 
 _LAST_ANALYSIS = {}
 _LAST_PAYLOAD = {}
@@ -146,10 +154,13 @@ def _sanitise(s: dict) -> dict:
     except (TypeError, ValueError):
         s["level_proximity_atr"] = DEFAULTS["level_proximity_atr"]
     sev = s.get("push_severity")
-    allowed = {"confirmed", "tp1", "tp2", "stopped", "invalidated", "armed"}
-    s["push_severity"] = ([x for x in sev if isinstance(x, str) and x in allowed]
+    s["push_severity"] = ([x for x in sev if isinstance(x, str) and x in PUSH_EVENTS]
                           if isinstance(sev, list) else list(DEFAULTS["push_severity"]))
-    for key, lo, hi in (("max_alert_age_min", 1, 1440), ("max_push_attempts", 1, 20)):
+    s["push_state_change"] = (s.get("push_state_change")
+                              if isinstance(s.get("push_state_change"), bool)
+                              else True)
+    for key, lo, hi in (("max_alert_age_min", 1, 1440), ("max_push_attempts", 1, 20),
+                        ("state_change_cooldown_min", 5, 1440)):
         try:
             s[key] = max(lo, min(hi, int(s.get(key))))
         except (TypeError, ValueError):
@@ -447,6 +458,93 @@ def _plan_text(plan: dict, event: dict, payload: dict | None = None) -> str:
     return text if len(text) <= 700 else text[:699] + "…"
 
 
+# ---------------------------------------------------------------------------
+# market state notifications (trend / structure / regime switches)
+# ---------------------------------------------------------------------------
+
+_LAST_MARKET_SIG: dict[str, dict] = {}
+
+
+def _market_signature(payload: dict) -> dict:
+    """The four observable states that define a market regime switch."""
+    ivs = payload.get("intervals") or {}
+    primary = (ivs.get("4h")
+               or ivs.get((payload.get("interval_order") or ["4h"])[0]) or {})
+    reg = primary.get("regime") or {}
+    return {
+        "direction": (payload.get("combined") or {}).get("direction"),
+        "structure": (primary.get("structure") or {}).get("state"),
+        "regime": reg.get("regime") or reg.get("state"),
+        "mtf": (payload.get("mtf") or {}).get("label"),
+    }
+
+
+def _state_text(symbol: str, payload: dict, changes: list) -> str:
+    px = payload.get("last_price") or payload.get("price")
+    try:
+        px_s = "%s" % format(float(px), ",.2f")
+    except (TypeError, ValueError):
+        px_s = "—"
+    ivs = "+".join(payload.get("interval_order") or []) or "—"
+    lines = [
+        "%s · 市场状态切换" % str(symbol).replace("USDT", "/USDT"),
+        "状态：趋势 / 结构 / 状态机发生变化",
+        *["变化：%s" % c for c in changes],
+        "现价 %s ｜ 周期 %s" % (px_s, ivs),
+        "操作：仅状态提示，不改变已有交易计划；以计划确认 / 作废消息为准。",
+        "依据：确定性引擎分析快照（多周期方向、结构状态、regime、MTF）。",
+        "分析工具，不构成投资建议。",
+    ]
+    return "\n".join(lines)[:700]
+
+
+def notify_market_state(symbol: str, payload: dict, settings: dict,
+                        db_path: str = DB_PATH) -> list:
+    """Push a single consolidated message when the market state flips.
+
+    State is persisted in market_events so a service restart does not replay
+    the same switch. Identical switches are suppressed for a configurable
+    cooldown. Returns the list of changed dimensions.
+    """
+    if not (settings or {}).get("push_state_change", True):
+        return []
+    if "state_change" not in (settings.get("push_severity") or []):
+        return []
+    sig = _market_signature(payload)
+    prev = _LAST_MARKET_SIG.get(symbol)
+    if prev is None:
+        raw = store.latest_market_state(db_path, symbol)
+        try:
+            prev = json.loads(raw) if raw else None
+        except Exception:
+            prev = None
+    _LAST_MARKET_SIG[symbol] = sig
+    now = int(time.time() * 1000)
+    if prev is None:
+        store.add_market_event(db_path, symbol, "baseline", "",
+                               json.dumps(sig, sort_keys=True), now,
+                               "初始状态基线（不推送）")
+        return []
+    changes = ["%s: %s → %s" % (k, prev.get(k), sig.get(k))
+               for k in ("direction", "structure", "regime", "mtf")
+               if prev.get(k) != sig.get(k)]
+    if not changes:
+        return []
+    old_s = json.dumps(prev, sort_keys=True)
+    new_s = json.dumps(sig, sort_keys=True)
+    cooldown = int(settings.get("state_change_cooldown_min") or 60) * 60_000
+    if store.recent_market_event(db_path, symbol, "state_change",
+                                 old_s, new_s, now - cooldown):
+        return []
+    eid = store.add_market_event(db_path, symbol, "state_change",
+                                 old_s, new_s, now, "；".join(changes))
+    if eid:
+        store.outbox_add(db_path, -int(eid), "qq",
+                         _state_text(symbol, payload, changes),
+                         dedupe_min=int(settings.get("push_dedupe_min") or 0),
+                         urgent=1)
+    return changes
+
 
 # ---------------------------------------------------------------------------
 # analysis + plan refresh
@@ -461,6 +559,11 @@ def analyze_symbol(symbol: str, settings: dict | None = None, db_path: str = DB_
     payload = analysis.analyze_symbol(symbol, ivs, params, prof.get("version") or 0)
     _LAST_ANALYSIS[symbol] = int(time.time() * 1000)
     _LAST_PAYLOAD[symbol] = payload
+    # Trend / structure / regime switches are first-class notifications.
+    try:
+        notify_market_state(symbol, payload, s, db_path)
+    except Exception as e:
+        payload["state_notify_error"] = str(e)[:160]
     if not force_plan:
         payload["plan"] = store.active_plan(db_path, symbol)
         return payload
@@ -634,6 +737,23 @@ def _confirm_arrival(plan: dict, price, settings: dict, db_path: str,
         _CONFIRM_RETRIES[pid] = n + 1
         events.append({"type": "confirm_error", "plan_id": pid,
                        "attempt": n + 1, "error": str(e)[:160]})
+        if "confirm_error" in (settings.get("push_severity") or []):
+            try:
+                eid2 = store.add_market_event(
+                    db_path, plan.get("symbol") or "", "confirm_error", "", "",
+                    int(time.time() * 1000), "确认重分析失败: %s" % str(e)[:160])
+                if eid2:
+                    store.outbox_add(
+                        db_path, -int(eid2), "qq",
+                        "%s · 确认门异常\n状态：重分析失败，将在下个 tick 重试（最多 3 次）\n"
+                        "操作：不交易；计划保持 triggered，不会静默卡死。\n原因：%s\n"
+                        "分析工具，不构成投资建议。" % (
+                            (plan.get("symbol") or "").replace("USDT", "/USDT"),
+                            str(e)[:120]),
+                        dedupe_min=int(settings.get("push_dedupe_min") or 0),
+                        urgent=1)
+            except Exception:
+                pass
 
 
 def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
@@ -668,6 +788,10 @@ def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
             eid = store.add_plan_event(db_path, updated, ev,
                                        planlib.event_key(updated, ev))
             events.append(ev)
+            if eid and "triggered" in (s.get("push_severity") or []):
+                store.outbox_add(db_path, eid, "qq", _plan_text(updated, ev),
+                                 dedupe_min=int(s.get("push_dedupe_min") or 0),
+                                 urgent=1)
             # "think on arrival": full re-analysis + shared confirmation gate.
             _confirm_arrival(updated, price, s, db_path, events)
         else:
@@ -683,11 +807,13 @@ def tick(settings: dict | None = None, db_path: str = DB_PATH) -> list:
                 store.outbox_add(db_path, eid, "qq", _plan_text(updated, ev), dedupe_min=int(s.get("push_dedupe_min") or 0))
             if updated.get("status") in ("closed", "void"):
                 store.record_plan_signal(db_path, updated)
-    if events and s.get("auto_push"):
+    # Drain once per tick. Market state changes can create outbox rows without
+    # any plan event, so this must not be conditioned on `events`.
+    if s.get("auto_push"):
         try:
             push.push_outbox(db_path, s)
-        except Exception:
-            pass
+        except Exception as e:
+            events.append({"type": "push_error", "error": str(e)[:160]})
     return events
 
 

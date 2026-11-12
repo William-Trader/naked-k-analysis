@@ -42,14 +42,24 @@ def load_env_file(path: str) -> None:
         return
 
 
+def _single_target(value) -> str:
+    """Hard guarantee: every message goes to exactly ONE configured group."""
+    v = str(value or "").strip()
+    if not v:
+        return ""
+    if any(c in v for c in (",", ";", "\n", "\r", " ", "\t")):
+        raise ValueError("qq_target must be a single group id, got %r" % v)
+    return v
+
+
 def resolve_target(cfg: dict, db_path: str):
     target = (cfg or {}).get("qq_target") or os.environ.get("BEAGLE_QQ_TARGET")
-    if target:
-        return target
-    path = os.environ.get("BEAGLE_ENV_FILE") or os.path.join(
-        os.path.dirname(db_path) or ".", ".beagle.env")
-    load_env_file(path)
-    return os.environ.get("BEAGLE_QQ_TARGET")
+    if not target:
+        path = os.environ.get("BEAGLE_ENV_FILE") or os.path.join(
+            os.path.dirname(db_path) or ".", ".beagle.env")
+        load_env_file(path)
+        target = os.environ.get("BEAGLE_QQ_TARGET")
+    return _single_target(target)
 
 
 def transport_host(cfg: dict | None) -> str:
@@ -178,7 +188,10 @@ def push_outbox(db_path: str, cfg: dict | None = None, dry_run: bool = False,
     pending) everything except P0, which maps to stop / invalidation.
     """
     cfg = cfg or {}
-    target = resolve_target(cfg, db_path)
+    try:
+        target = resolve_target(cfg, db_path)
+    except ValueError as e:
+        return [{"status": "invalid_target", "error": str(e)}]
     out = []
     now_hour = time.localtime().tm_hour
     now_ms = int(time.time() * 1000)
@@ -189,8 +202,11 @@ def push_outbox(db_path: str, cfg: dict | None = None, dry_run: bool = False,
         if dry_run:
             out.append({"id": oid, "status": "dry", "text": row.get("text", "")[:120]})
             continue
-        urgent = any(k in (row.get("text") or "")
-                     for k in ("止损离场", "结构失效", "计划超时"))
+        # Explicit urgent flag (set by state switches / triggers / errors)
+        # plus the legacy keyword fallback for older outbox rows.
+        urgent = bool(row.get("urgent")) or any(
+            k in (row.get("text") or "")
+            for k in ("止损离场", "结构失效", "计划超时"))
         # Quiet hours must defer, not destroy. The old code checked staleness
         # BEFORE the quiet gate, so messages born at 23:00 died at 23:30 and
         # the same 20 pending rows blocked the queue as head-of-line.
